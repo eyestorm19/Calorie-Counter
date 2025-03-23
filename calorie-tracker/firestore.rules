@@ -1,0 +1,31 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper function to check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Helper function to check if user is accessing their own data
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // Helper function to check if document ID matches user's data format
+    function isValidDailyData(docId) {
+      let parts = docId.split('_');
+      return parts.size() == 2 && parts[0] == request.auth.uid;
+    }
+
+    // Users collection rules
+    match /users/{userId} {
+      allow read, write: if isOwner(userId);
+    }
+
+    // Daily data collection rules
+    match /dailyData/{docId} {
+      allow read, write: if isAuthenticated() && isValidDailyData(docId);
+    }
+  }
+} 
