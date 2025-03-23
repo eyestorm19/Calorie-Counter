@@ -14,6 +14,7 @@ export default function Track() {
   const [success, setSuccess] = useState('');
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [editingActivity, setEditingActivity] = useState<Activity | null>(null);
+  const [animatedNetCalories, setAnimatedNetCalories] = useState(0);
 
   const targetCalories = userProfile?.targetCalories || 2000;
   const consumedCalories = activities.reduce((sum, a) => a.type === 'consume' ? sum + a.calories : sum, 0);
@@ -26,6 +27,14 @@ export default function Track() {
       loadTodayData();
     }
   }, [user]);
+
+  useEffect(() => {
+    setAnimatedNetCalories(0);
+    const timer = setTimeout(() => {
+      setAnimatedNetCalories(netCalories);
+    }, 100);
+    return () => clearTimeout(timer);
+  }, [netCalories]);
 
   const loadUserProfile = async () => {
     if (!user) return;
@@ -320,11 +329,11 @@ export default function Track() {
             {/* Progress bar */}
             {netCalories !== 0 && (
               <div 
-                className={`progress-fill ${netCalories > 0 ? 'positive' : 'negative'}`}
+                className={`progress-fill ${animatedNetCalories > 0 ? 'positive' : 'negative'}`}
                 style={{
-                  left: netCalories < 0 ? 'auto' : '50%',
-                  right: netCalories < 0 ? '50%' : 'auto',
-                  width: `${Math.min(Math.abs(netCalories) / targetCalories * 50, 50)}%`
+                  left: animatedNetCalories < 0 ? 'auto' : '50%',
+                  right: animatedNetCalories < 0 ? '50%' : 'auto',
+                  width: `${Math.min(Math.abs(animatedNetCalories) / targetCalories * 50, 50)}%`
                 }}
               />
             )}
@@ -335,9 +344,9 @@ export default function Track() {
               <span className="marker zero">0</span>
               <span className="marker target">Target: {targetCalories}</span>
               <span 
-                className={`marker current ${netCalories > 0 ? 'positive' : 'negative'}`}
+                className={`marker current ${animatedNetCalories > 0 ? 'positive' : 'negative'}`}
                 style={{
-                  left: `${netCalories < 0 ? 50 - (Math.abs(netCalories) / targetCalories * 50) : 50 + (netCalories / targetCalories * 50)}%`
+                  left: `${animatedNetCalories < 0 ? 50 - (Math.abs(animatedNetCalories) / targetCalories * 50) : 50 + (animatedNetCalories / targetCalories * 50)}%`
                 }}
               >
                 {netCalories}

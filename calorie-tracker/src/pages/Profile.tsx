@@ -34,11 +34,21 @@ export default function Profile() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [weeklyData, setWeeklyData] = useState<DailyData[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     if (user) {
-      loadProfile();
-      loadWeeklyData();
+      const loadData = async () => {
+        setIsLoading(true);
+        try {
+          await Promise.all([loadProfile(), loadWeeklyData()]);
+        } catch (err) {
+          console.error('Error loading data:', err);
+        } finally {
+          setIsLoading(false);
+        }
+      };
+      loadData();
     }
   }, [user]);
 
@@ -63,7 +73,6 @@ export default function Profile() {
         return date.toISOString().split('T')[0];
       }).reverse();
 
-      const dailyDataRef = collection(db, 'dailyData');
       const docIds = dates.map(date => `${user.uid}_${date}`);
       
       const weekData: DailyData[] = [];
@@ -170,7 +179,7 @@ export default function Profile() {
     }
   };
 
-  const weeklyStats = {
+  const weeklyStats = weeklyData.length > 0 ? {
     avgNet: Math.round(weeklyData.reduce((sum, day) => sum + day.netCalories, 0) / weeklyData.length),
     avgConsumed: Math.round(weeklyData.reduce((sum, day) => sum + day.totalConsumed, 0) / weeklyData.length),
     avgBurned: Math.round(weeklyData.reduce((sum, day) => sum + day.totalBurned, 0) / weeklyData.length),
@@ -178,6 +187,11 @@ export default function Profile() {
       const target = parseInt(editedTargetCalories) || 2000;
       return day.netCalories <= target && day.netCalories >= target * 0.9;
     }).length
+  } : {
+    avgNet: 0,
+    avgConsumed: 0,
+    avgBurned: 0,
+    daysOnTarget: 0
   };
 
   return (
@@ -186,87 +200,93 @@ export default function Profile() {
       {error && <div className="error">{error}</div>}
       {success && <div className="success">{success}</div>}
 
-      <div className="profile-info">
-        <div className="profile-header">
-          <h3>Profile Information</h3>
-          {!isEditing && (
-            <button onClick={handleEdit} className="edit-button">
-              Edit Profile
-            </button>
-          )}
-        </div>
-        
-        <div className="profile-content">
-          <div className="profile-field">
-            <span className="field-label">Name:</span>
-            {isEditing ? (
-              <input
-                type="text"
-                value={editedName}
-                onChange={(e) => setEditedName(e.target.value)}
-                className="inline-edit-input"
-              />
-            ) : (
-              <span className="field-value">{profile?.name}</span>
-            )}
-          </div>
-
-          <div className="profile-field">
-            <span className="field-label">Email:</span>
-            <span className="field-value">{user?.email}</span>
-          </div>
-
-          <div className="profile-field">
-            <span className="field-label">Daily Target Calories:</span>
-            {isEditing ? (
-              <input
-                type="number"
-                value={editedTargetCalories}
-                onChange={(e) => setEditedTargetCalories(e.target.value)}
-                className="inline-edit-input"
-              />
-            ) : (
-              <span className="field-value">{profile?.targetCalories}</span>
-            )}
-          </div>
-
-          {isEditing && (
-            <div className="profile-actions">
-              <button onClick={handleSave} className="save-button">
-                Save Changes
-              </button>
-              <button onClick={handleCancel} className="cancel-button">
-                Cancel
-              </button>
+      {isLoading ? (
+        <div className="loading-message">Loading profile data...</div>
+      ) : (
+        <>
+          <div className="profile-info">
+            <div className="profile-header">
+              <h3>Profile Information</h3>
+              {!isEditing && (
+                <button onClick={handleEdit} className="edit-button">
+                  Edit Profile
+                </button>
+              )}
             </div>
-          )}
-        </div>
-      </div>
+            
+            <div className="profile-content">
+              <div className="profile-field">
+                <span className="field-label">Name:</span>
+                {isEditing ? (
+                  <input
+                    type="text"
+                    value={editedName}
+                    onChange={(e) => setEditedName(e.target.value)}
+                    className="inline-edit-input"
+                  />
+                ) : (
+                  <span className="field-value">{profile?.name}</span>
+                )}
+              </div>
 
-      <div className="weekly-summary">
-        <h3>Weekly Summary</h3>
-        <div className="weekly-stats">
-          <div className="stat-item">
-            <span className="stat-label">Avg. Net Calories</span>
-            <span className="stat-value">{weeklyStats.avgNet}</span>
+              <div className="profile-field">
+                <span className="field-label">Email:</span>
+                <span className="field-value">{user?.email}</span>
+              </div>
+
+              <div className="profile-field">
+                <span className="field-label">Daily Target Calories:</span>
+                {isEditing ? (
+                  <input
+                    type="number"
+                    value={editedTargetCalories}
+                    onChange={(e) => setEditedTargetCalories(e.target.value)}
+                    className="inline-edit-input"
+                  />
+                ) : (
+                  <span className="field-value">{profile?.targetCalories}</span>
+                )}
+              </div>
+
+              {isEditing && (
+                <div className="profile-actions">
+                  <button onClick={handleSave} className="save-button">
+                    Save Changes
+                  </button>
+                  <button onClick={handleCancel} className="cancel-button">
+                    Cancel
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
-          <div className="stat-item">
-            <span className="stat-label">Avg. Calories Consumed</span>
-            <span className="stat-value">{weeklyStats.avgConsumed}</span>
+
+          <div className="weekly-summary">
+            <h3>Weekly Summary</h3>
+            <div className="weekly-stats">
+              <div className="stat-item">
+                <span className="stat-label">Avg. Net Calories</span>
+                <span className="stat-value">{weeklyStats.avgNet}</span>
+              </div>
+              <div className="stat-item">
+                <span className="stat-label">Avg. Calories Consumed</span>
+                <span className="stat-value">{weeklyStats.avgConsumed}</span>
+              </div>
+              <div className="stat-item">
+                <span className="stat-label">Avg. Calories Burned</span>
+                <span className="stat-value">{weeklyStats.avgBurned}</span>
+              </div>
+              <div className="stat-item">
+                <span className="stat-label">Days On Target</span>
+                <span className="stat-value">{weeklyStats.daysOnTarget} / 7</span>
+              </div>
+            </div>
+            <div className="weekly-chart">
+              <Line options={chartOptions} data={chartData} />
+            </div>
           </div>
-          <div className="stat-item">
-            <span className="stat-label">Avg. Calories Burned</span>
-            <span className="stat-value">{weeklyStats.avgBurned}</span>
-          </div>
-          <div className="stat-item">
-            <span className="stat-label">Days On Target</span>
-            <span className="stat-value">{weeklyStats.daysOnTarget} / 7</span>
-          </div>
-        </div>
-        <div className="weekly-chart">
-          <Line options={chartOptions} data={chartData} />
-        </div>
-      </div>
+        </>
+      )}
     </div>
   );
 } 

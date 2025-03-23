@@ -563,7 +563,7 @@ main {
 .progress-bar-wrapper {
   position: relative;
   height: 24px;
-  margin: 2rem 0 3rem 0;
+  margin: 2rem 0 3.5rem 0;
   border-radius: 12px;
   overflow: visible;
 }
@@ -590,8 +590,9 @@ main {
   position: absolute;
   top: 0;
   height: 100%;
-  transition: all 0.3s ease;
+  transition: all 0.8s cubic-bezier(0.4, 0, 0.2, 1);
   border-radius: 12px;
+  will-change: width, left, right;
 }
 
 .progress-fill.positive {
@@ -823,6 +824,17 @@ main {
   border-radius: 8px;
 }
 
+.loading-stats {
+  grid-column: 1 / -1;
+  text-align: center;
+  padding: 2rem;
+  color: var(--text-light);
+  font-size: 1.1rem;
+  background: var(--card-background);
+  border-radius: 6px;
+  box-shadow: 0 1px 3px var(--shadow-color);
+}
+
 .stat-item {
   position: relative;
   display: block;
@@ -941,7 +953,7 @@ main {
   }
 
   .progress-bar-wrapper {
-    margin: 1.5rem 0 2.5rem 0;
+    margin: 2rem 0 4rem 0;
   }
 
   .progress-details {
@@ -984,6 +996,23 @@ main {
   .edit-actions {
     width: 100%;
     justify-content: space-between;
+  }
+
+  .marker {
+    font-size: 0.75rem;
+  }
+
+  .marker.target {
+    top: 1.5rem;
+    transform: translateX(-100%);
+  }
+
+  .marker.zero {
+    top: 1.5rem;
+  }
+
+  .marker.current {
+    top: -0.5rem;
   }
 }
 
@@ -1072,24 +1101,15 @@ main {
 .progress-markers {
   position: absolute;
   width: 100%;
-  bottom: -2rem;
+  bottom: -2.5rem;
   left: 0;
-  height: 1.5rem;
-}
-
-.marker-line {
-  position: absolute;
-  height: 6px;
-  width: 1px;
-  background-color: var(--text-light);
-  bottom: 100%;
-  margin-bottom: 4px;
+  height: 2rem;
 }
 
 .marker {
   position: absolute;
   transform: translateX(-50%);
-  font-size: 0.85rem;
+  font-size: 0.8rem;
   color: var(--text-light);
   white-space: nowrap;
 }
@@ -1100,11 +1120,16 @@ main {
 
 .marker.target {
   left: 100%;
+  transform: translateX(-100%);
+  text-align: right;
 }
 
 .marker.current {
   color: var(--text-color);
   font-weight: 500;
+  top: -0.5rem;
+  transition: all 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+  will-change: left;
 }
 
 .marker.current.positive {
@@ -1148,4 +1173,26 @@ main {
   .calorie-value {
     white-space: nowrap;
   }
+}
+
+.loading-message {
+  text-align: center;
+  padding: 2rem;
+  margin: 2rem 0;
+  color: var(--text-light);
+  font-size: 1.1rem;
+  background: var(--card-background);
+  border-radius: 8px;
+  box-shadow: 0 2px 4px var(--shadow-color);
+}
+
+.loading-message::after {
+  content: "...";
+  animation: loading-dots 1.5s infinite;
+}
+
+@keyframes loading-dots {
+  0% { content: "."; }
+  33% { content: ".."; }
+  66% { content: "..."; }
 }
