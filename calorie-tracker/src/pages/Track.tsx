@@ -418,7 +418,12 @@ export default function Track() {
                 ) : (
                   <>
                     <div className="activity-info">
-                      <span>{activity.name}</span>
+                      <div className="activity-details">
+                        <span className="activity-name">{activity.name}</span>
+                        <span className="activity-time">
+                          {new Date(activity.timestamp.seconds * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                      </div>
                       <span className={`calorie-value ${activity.type === 'burn' ? 'burned' : 'consumed'}`}>
                         {activity.type === 'burn' ? '-' : '+'}{activity.calories} cal
                       </span>
