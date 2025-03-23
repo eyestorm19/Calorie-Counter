@@ -3,6 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { db } from '../config/firebase';
 import { doc, getDoc, setDoc, Timestamp } from 'firebase/firestore';
 import type { Activity, DailyData, UserProfile } from '../types';
+import ChatInput from '../components/ChatInput';
 
 export default function Track() {
   const { user } = useAuth();
@@ -11,7 +12,6 @@ export default function Track() {
   const [calories, setCalories] = useState('');
   const [isBurn, setIsBurn] = useState(false);
   const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [editingActivity, setEditingActivity] = useState<Activity | null>(null);
   const [animatedNetCalories, setAnimatedNetCalories] = useState(0);
@@ -124,48 +124,21 @@ export default function Track() {
 
       await setDoc(docRef, dailyData);
       setActivities(updatedActivities);
-      setSuccess('Activity deleted successfully!');
     } catch (err) {
       console.error('Error deleting activity:', err);
       setError('Failed to delete activity. Please try again.');
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!user) {
-      console.log('No user found in handleSubmit');
-      return;
-    }
-    if (!newActivity || !calories) {
-      console.log('Missing required fields:', { newActivity, calories });
-      return;
-    }
+  const handleActivityAdd = async (activityData: Omit<Activity, 'id' | 'timestamp'>) => {
+    if (!user) return;
 
     try {
       setError('');
-      setSuccess('');
       const today = new Date().toISOString().split('T')[0];
       const docPath = `${user.uid}_${today}`;
       const docRef = doc(db, 'dailyData', docPath);
 
-      // Log the current state
-      console.log('Current state before update:', {
-        editingActivity,
-        newActivity,
-        calories,
-        isBurn,
-        activities: activities.length
-      });
-
-      // Validate calories input
-      const caloriesNum = parseInt(calories);
-      if (isNaN(caloriesNum) || caloriesNum <= 0) {
-        setError('Please enter a valid number of calories');
-        return;
-      }
-
-      // First, get the current data
       const docSnap = await getDoc(docRef);
       let currentActivities = activities;
       if (docSnap.exists()) {
@@ -173,48 +146,13 @@ export default function Track() {
         currentActivities = data.activities;
       }
 
-      let updatedActivities: Activity[];
-      if (editingActivity) {
-        // Update existing activity
-        console.log('Updating activity:', {
-          id: editingActivity.id,
-          oldName: editingActivity.name,
-          newName: newActivity,
-          oldCalories: editingActivity.calories,
-          newCalories: caloriesNum,
-          oldType: editingActivity.type,
-          newType: isBurn ? 'burn' : 'consume'
-        });
+      const newActivity: Activity = {
+        id: Date.now().toString(),
+        ...activityData,
+        timestamp: Timestamp.now()
+      };
 
-        updatedActivities = currentActivities.map(activity => 
-          activity.id === editingActivity.id 
-            ? {
-                id: editingActivity.id,
-                name: newActivity.trim(),
-                calories: caloriesNum,
-                type: isBurn ? 'burn' : 'consume' as const,
-                timestamp: Timestamp.now()
-              }
-            : activity
-        );
-      } else {
-        // Add new activity
-        const newActivityObj: Activity = {
-          id: Date.now().toString(),
-          name: newActivity.trim(),
-          type: isBurn ? 'burn' : 'consume' as const,
-          calories: caloriesNum,
-          timestamp: Timestamp.now()
-        };
-        updatedActivities = [...currentActivities, newActivityObj];
-      }
-
-      console.log('Activities after modification:', {
-        before: currentActivities.length,
-        after: updatedActivities.length,
-        editMode: !!editingActivity
-      });
-
+      const updatedActivities = [...currentActivities, newActivity];
       const updatedConsumed = updatedActivities
         .filter(a => a.type === 'consume')
         .reduce((sum, a) => sum + a.calories, 0);
@@ -233,29 +171,11 @@ export default function Track() {
         date: today
       };
 
-      console.log('Saving updated data:', {
-        activitiesCount: updatedActivities.length,
-        totalConsumed: updatedConsumed,
-        totalBurned: updatedBurned,
-        netCalories: updatedNet
-      });
-
       await setDoc(docRef, dailyData);
-
-      // Update local state
       setActivities(updatedActivities);
-      setNewActivity('');
-      setCalories('');
-      setIsBurn(false);
-      setEditingActivity(null);
-      setSuccess(editingActivity ? 'Activity updated successfully!' : 'Activity added successfully!');
     } catch (err) {
-      console.error('Error saving activity:', err);
-      if (err instanceof Error) {
-        setError(`Failed to ${editingActivity ? 'update' : 'add'} activity: ${err.message}`);
-      } else {
-        setError(`Failed to ${editingActivity ? 'update' : 'add'} activity. Please try again.`);
-      }
+      console.error('Error adding activity:', err);
+      setError('Failed to add activity');
     }
   };
 
@@ -263,65 +183,26 @@ export default function Track() {
     <div className="container">
       <h2>Track Calories</h2>
       {error && <div className="error">{error}</div>}
-      {success && <div className="success">{success}</div>}
 
-      <form onSubmit={handleSubmit}>
-        <div className="form-group">
-          <label htmlFor="activity">Activity</label>
-          <input
-            type="text"
-            id="activity"
-            value={newActivity}
-            onChange={(e) => setNewActivity(e.target.value)}
-            placeholder="e.g., Breakfast, Running"
-            required
-          />
-        </div>
-        <div className="form-group">
-          <label htmlFor="calories">Calories</label>
-          <input
-            type="number"
-            id="calories"
-            value={calories}
-            onChange={(e) => setCalories(e.target.value)}
-            required
-          />
-        </div>
-        <div className="form-group">
-          <label>
-            <input
-              type="checkbox"
-              checked={isBurn}
-              onChange={(e) => setIsBurn(e.target.checked)}
-            />
-            This is a calorie burn activity
-          </label>
-        </div>
-        <div className="form-actions">
-          <button type="submit">
-            {editingActivity ? 'Update Activity' : 'Add Activity'}
-          </button>
-          {editingActivity && (
-            <button 
-              type="button" 
-              onClick={() => {
-                setEditingActivity(null);
-                setNewActivity('');
-                setCalories('');
-                setIsBurn(false);
-              }}
-              className="cancel-button"
-            >
-              Cancel Edit
-            </button>
-          )}
-        </div>
-      </form>
+      <ChatInput onActivityAdd={handleActivityAdd} />
 
       <div className="calorie-progress">
         <h3>Today's Progress</h3>
         <div className="progress-container">
           <div className="progress-bar-wrapper">
+            {/* Net calories marker above */}
+            <div className="progress-markers-top">
+              <span 
+                className={`marker current ${animatedNetCalories > 0 ? 'positive' : 'negative'}`}
+                style={{
+                  left: `${animatedNetCalories < 0 
+                    ? 50 - (Math.abs(animatedNetCalories) / (Math.max(targetCalories, Math.abs(netCalories))) * 50) 
+                    : Math.min(100, 50 + (animatedNetCalories / targetCalories * 50))}%`
+                }}
+              >
+                {netCalories}
+              </span>
+            </div>
             {/* Background bar showing target range */}
             <div className="progress-background">
               <div className="target-range" style={{ width: '50%', left: '50%' }} />
@@ -333,31 +214,21 @@ export default function Track() {
                 style={{
                   left: animatedNetCalories < 0 ? 'auto' : '50%',
                   right: animatedNetCalories < 0 ? '50%' : 'auto',
-                  width: `${Math.min(Math.abs(animatedNetCalories) / targetCalories * 50, 50)}%`
+                  width: `${animatedNetCalories < 0 
+                    ? Math.abs(animatedNetCalories) / (Math.max(targetCalories, Math.abs(netCalories))) * 50
+                    : Math.min(50, (animatedNetCalories / targetCalories) * 50)}%`
                 }}
               />
             )}
-            {/* X-axis markers */}
-            <div className="progress-markers">
+            {/* Zero and target markers below */}
+            <div className="progress-markers-bottom">
               <div className="marker-line" style={{ left: '50%' }} />
               <div className="marker-line" style={{ left: '100%' }} />
               <span className="marker zero">0</span>
               <span className="marker target">Target: {targetCalories}</span>
-              <span 
-                className={`marker current ${animatedNetCalories > 0 ? 'positive' : 'negative'}`}
-                style={{
-                  left: `${animatedNetCalories < 0 ? 50 - (Math.abs(animatedNetCalories) / targetCalories * 50) : 50 + (animatedNetCalories / targetCalories * 50)}%`
-                }}
-              >
-                {netCalories}
-              </span>
             </div>
           </div>
           <div className="progress-details">
-            <div className="detail-item">
-              <span className="detail-label">Net Calories</span>
-              <span className="detail-value">{netCalories}</span>
-            </div>
             <div className="detail-item">
               <span className="detail-label">Consumed</span>
               <span className="detail-value">{consumedCalories}</span>
@@ -405,12 +276,6 @@ export default function Track() {
                       </label>
                     </div>
                     <div className="edit-actions">
-                      <button 
-                        onClick={handleSubmit}
-                        className="save-button"
-                      >
-                        Save
-                      </button>
                       <button 
                         onClick={() => {
                           setEditingActivity(null);
