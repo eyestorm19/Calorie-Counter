@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { useDate } from '../contexts/DateContext';
 import { db } from '../config/firebase';
 import { doc, getDoc, updateDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { UserProfile, DailyData } from '../types';
@@ -12,7 +13,8 @@ import {
   LineElement,
   Title,
   Tooltip,
-  Legend
+  Legend,
+  ChartOptions
 } from 'chart.js';
 
 ChartJS.register(
@@ -25,16 +27,46 @@ ChartJS.register(
   Legend
 );
 
+// Common timezones for the dropdown
+const COMMON_TIMEZONES = [
+  { value: 'America/New_York', label: 'Eastern Time (ET)' },
+  { value: 'America/Chicago', label: 'Central Time (CT)' },
+  { value: 'America/Denver', label: 'Mountain Time (MT)' },
+  { value: 'America/Los_Angeles', label: 'Pacific Time (PT)' },
+  { value: 'America/Anchorage', label: 'Alaska Time (AKT)' },
+  { value: 'Pacific/Honolulu', label: 'Hawaii Time (HT)' },
+  { value: 'Europe/London', label: 'London (GMT/BST)' },
+  { value: 'Europe/Paris', label: 'Paris (CET/CEST)' },
+  { value: 'Asia/Tokyo', label: 'Tokyo (JST)' },
+  { value: 'Asia/Shanghai', label: 'Shanghai (CST)' },
+  { value: 'Australia/Sydney', label: 'Sydney (AEST)' }
+];
+
 export default function Profile() {
-  const { user } = useAuth();
+  const { user, isNewUser, clearNewUserFlag } = useAuth();
+  const { dbKey, formattedDate, isNewDay } = useDate();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [editedName, setEditedName] = useState('');
   const [editedTargetCalories, setEditedTargetCalories] = useState('');
+  const [editedTimezone, setEditedTimezone] = useState('');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [weeklyData, setWeeklyData] = useState<DailyData[]>([]);
+  const [weeklyStats, setWeeklyStats] = useState({
+    avgNet: 0,
+    avgConsumed: 0,
+    avgBurned: 0,
+    daysOnTarget: 0
+  });
   const [isLoading, setIsLoading] = useState(true);
+
+  // If user is new, automatically enable editing mode
+  useEffect(() => {
+    if (isNewUser) {
+      setIsEditing(true);
+    }
+  }, [isNewUser]);
 
   useEffect(() => {
     if (user) {
@@ -50,7 +82,21 @@ export default function Profile() {
       };
       loadData();
     }
-  }, [user]);
+  }, [user, dbKey]);
+
+  useEffect(() => {
+    if (isNewDay && user) {
+      console.log('New day detected in Profile, reloading data');
+      const loadData = async () => {
+        try {
+          await Promise.all([loadProfile(), loadWeeklyData()]);
+        } catch (err) {
+          console.error('Error reloading data on new day:', err);
+        }
+      };
+      loadData();
+    }
+  }, [isNewDay]);
 
   const loadProfile = async () => {
     if (!user) return;
@@ -61,74 +107,210 @@ export default function Profile() {
       setProfile(data);
       setEditedName(data.name);
       setEditedTargetCalories(data.targetCalories.toString());
+      setEditedTimezone(data.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone);
     }
   };
 
   const loadWeeklyData = async () => {
     if (!user) return;
     try {
-      const dates = Array.from({ length: 7 }, (_, i) => {
-        const date = new Date();
+      console.group('Weekly Data Loading Process');
+      
+      // 1. Get today's date from context
+      const today = new Date(dbKey);
+      console.log('Today (from context):', {
+        dbKey,
+        dateObject: today,
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
+      });
+      
+      // 2. Generate array of past 7 days
+      const weekDates = Array.from({ length: 7 }, (_, i) => {
+        const date = new Date(today);
         date.setDate(date.getDate() - i);
-        return date.toISOString().split('T')[0];
+        // Ensure we're using the correct year from dbKey
+        const year = new Date(dbKey).getFullYear();
+        date.setFullYear(year);
+        return {
+          date: date.toISOString().split('T')[0],
+          displayDate: date.toLocaleDateString('en-US', { 
+            weekday: 'short', 
+            month: 'short', 
+            day: 'numeric' 
+          })
+        };
       }).reverse();
 
-      const docIds = dates.map(date => `${user.uid}_${date}`);
+      console.log('Week dates generated:', weekDates);
       
-      const weekData: DailyData[] = [];
-      for (const docId of docIds) {
-        const docRef = doc(db, 'dailyData', docId);
-        const docSnap = await getDoc(docRef);
-        if (docSnap.exists()) {
-          weekData.push(docSnap.data() as DailyData);
+      // 3. Create weekly data structure
+      const weeklyDataStructure = {
+        dates: weekDates,
+        dailyData: new Map<string, DailyData>(),
+        summary: {
+          totalConsumed: 0,
+          totalBurned: 0,
+          totalNet: 0,
+          daysWithActivity: 0,
+          daysOnTarget: 0
+        }
+      };
+
+      // 4. Fetch data for each date
+      const docRefs = weekDates.map(({ date }) => ({
+        date,
+        ref: doc(db, 'users', user.uid, 'dailyLogs', date)
+      }));
+
+      console.log('Document references created:', docRefs.map(ref => ({
+        date: ref.date,
+        path: ref.ref.path
+      })));
+
+      console.log('Fetching data from Firebase...');
+      const snapshots = await Promise.all(
+        docRefs.map(async ({ date, ref }) => {
+          console.log(`Attempting to fetch data for ${date} from path: ${ref.path}`);
+          const snap = await getDoc(ref);
+          console.log(`Fetch result for ${date}:`, {
+            exists: snap.exists(),
+            id: snap.id,
+            path: snap.ref.path,
+            data: snap.exists() ? snap.data() : null
+          });
+          return { date, snapshot: snap };
+        })
+      );
+
+      // 5. Process and store the data
+      snapshots.forEach(({ date, snapshot }) => {
+        console.group(`Processing ${date}`);
+        console.log('Document details:', {
+          path: snapshot.ref.path,
+          exists: snapshot.exists(),
+          id: snapshot.id
+        });
+
+        if (snapshot.exists()) {
+          const data = snapshot.data() as DailyData;
+          console.log('Document data:', {
+            date: data.date,
+            netCalories: data.netCalories,
+            totalConsumed: data.totalConsumed,
+            totalBurned: data.totalBurned,
+            activitiesCount: data.activities?.length || 0,
+            activities: data.activities
+          });
+          weeklyDataStructure.dailyData.set(date, data);
+          
+          // Update summary
+          weeklyDataStructure.summary.totalConsumed += data.totalConsumed;
+          weeklyDataStructure.summary.totalBurned += data.totalBurned;
+          weeklyDataStructure.summary.totalNet += data.netCalories;
+          if (data.activities?.length > 0) weeklyDataStructure.summary.daysWithActivity++;
+          const target = parseInt(editedTargetCalories) || 2000;
+          if (data.netCalories <= target) {
+            weeklyDataStructure.summary.daysOnTarget++;
+          }
         } else {
-          weekData.push({
+          console.log('No document found. Details:', {
+            date,
+            path: snapshot.ref.path,
+            exists: snapshot.exists()
+          });
+          const defaultData: DailyData = {
             activities: [],
             totalConsumed: 0,
             totalBurned: 0,
             netCalories: 0,
             deficitToTarget: parseInt(editedTargetCalories) || 2000,
-            date: docId.split('_')[1]
-          });
+            date: date
+          };
+          weeklyDataStructure.dailyData.set(date, defaultData);
         }
-      }
+        console.groupEnd();
+      });
+
+      // 6. Create final array for state update
+      const weekData = weekDates.map(({ date }) => 
+        weeklyDataStructure.dailyData.get(date)!
+      );
+
+      // Calculate weekly stats
+      const stats = {
+        avgNet: Math.round(weeklyDataStructure.summary.totalNet / weekData.length),
+        avgConsumed: Math.round(weeklyDataStructure.summary.totalConsumed / weekData.length),
+        avgBurned: Math.round(weeklyDataStructure.summary.totalBurned / weekData.length),
+        daysOnTarget: weeklyDataStructure.summary.daysOnTarget
+      };
+
+      // Log final data structure
+      console.log('Weekly data structure:', {
+        dates: weeklyDataStructure.dates.map(d => d.date),
+        summary: weeklyDataStructure.summary,
+        stats,
+        dailyDataMap: Object.fromEntries(weeklyDataStructure.dailyData),
+        finalArray: weekData.map(data => ({
+          date: data.date,
+          netCalories: data.netCalories,
+          activitiesCount: data.activities?.length || 0
+        }))
+      });
+
       setWeeklyData(weekData);
+      setWeeklyStats(stats);
+      console.groupEnd();
     } catch (err) {
       console.error('Error loading weekly data:', err);
+      console.groupEnd();
     }
   };
 
   const handleEdit = () => {
-    if (profile) {
-      setEditedName(profile.name);
-      setEditedTargetCalories(profile.targetCalories.toString());
-      setIsEditing(true);
-    }
+    setIsEditing(true);
+    setError('');
+    setSuccess('');
   };
 
   const handleCancel = () => {
-    setIsEditing(false);
     if (profile) {
       setEditedName(profile.name);
       setEditedTargetCalories(profile.targetCalories.toString());
+      setEditedTimezone(profile.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone);
     }
+    setIsEditing(false);
+    setError('');
+    setSuccess('');
   };
 
   const handleSave = async () => {
-    if (!user || !profile) return;
-
+    if (!user) return;
+    
     try {
-      setError('');
-      setSuccess('');
-      const docRef = doc(db, 'users', user.uid);
-      await updateDoc(docRef, {
+      const targetCaloriesValue = parseInt(editedTargetCalories);
+      if (isNaN(targetCaloriesValue) || targetCaloriesValue <= 0) {
+        setError('Please enter a valid target calories value');
+        return;
+      }
+      
+      const updatedProfile = {
         name: editedName,
-        targetCalories: parseInt(editedTargetCalories)
-      });
-      setSuccess('Profile updated successfully!');
-      loadProfile();
-      loadWeeklyData();
+        targetCalories: targetCaloriesValue,
+        timezone: editedTimezone,
+        updatedAt: new Date()
+      };
+      
+      const docRef = doc(db, 'users', user.uid);
+      await updateDoc(docRef, updatedProfile);
+      
+      // If user was new, clear the flag after successful profile update
+      if (isNewUser) {
+        clearNewUserFlag();
+      }
+      
+      setSuccess('Profile updated successfully');
       setIsEditing(false);
+      loadProfile(); // Reload profile data
     } catch (err) {
       setError('Failed to update profile');
     }
@@ -136,70 +318,160 @@ export default function Profile() {
 
   const chartData = {
     labels: weeklyData.map(data => {
-      const date = new Date(data.date);
-      return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+      const date = new Date(`${data.date}T00:00:00`);
+      const label = date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+      return label;
     }),
     datasets: [
       {
         label: 'Net Calories',
         data: weeklyData.map(data => data.netCalories),
-        borderColor: 'rgb(75, 192, 192)',
-        backgroundColor: 'rgba(75, 192, 192, 0.5)',
-        tension: 0.1
+        borderColor: '#E91E63',  // Dark Pink
+        backgroundColor: '#E91E63',
+        tension: 0.1,
+        fill: false
       },
       {
         label: 'Target',
         data: weeklyData.map(() => parseInt(editedTargetCalories) || 2000),
-        borderColor: 'rgb(255, 99, 132)',
-        backgroundColor: 'rgba(255, 99, 132, 0.5)',
-        borderDash: [5, 5]
+        borderColor: '#E91E63',  // Dark Pink
+        backgroundColor: '#E91E63',
+        borderDash: [5, 5],
+        fill: false
       }
     ]
   };
 
-  const chartOptions = {
+  console.group('Chart Data Mapping Process');
+  
+  // Log the data mapping process
+  console.log('Data mapping details:', weeklyData.map((data, index) => {
+    const date = new Date(`${data.date}T00:00:00`);
+    const label = date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+    return {
+      index,
+      originalDate: data.date,
+      dateObject: date.toString(),
+      formattedLabel: label,
+      netCalories: data.netCalories,
+      totalConsumed: data.totalConsumed,
+      totalBurned: data.totalBurned,
+      isDefaultData: !data.activities || data.activities.length === 0
+    };
+  }));
+
+  // Verify data alignment
+  console.log('Data alignment check:', {
+    totalDays: weeklyData.length,
+    datesInOrder: weeklyData.map(d => d.date),
+    labelsInOrder: chartData.labels,
+    netCaloriesInOrder: chartData.datasets[0].data,
+    targetLineValues: chartData.datasets[1].data
+  });
+
+  // Check for any potential gaps or misalignments
+  const dataIntegrityCheck = weeklyData.map((data, index) => {
+    const nextDay = index < weeklyData.length - 1 ? weeklyData[index + 1].date : null;
+    let isSequential = false;
+    
+    if (nextDay) {
+      const currentDate = new Date(data.date);
+      const nextDate = new Date(nextDay);
+      const diffTime = Math.abs(nextDate.getTime() - currentDate.getTime());
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      isSequential = diffDays === 1;
+    }
+
+    return {
+      currentDate: data.date,
+      nextDate: nextDay,
+      isSequential: nextDay ? isSequential : 'lastDay',
+      hasData: data.activities && data.activities.length > 0
+    };
+  });
+
+  console.log('Data integrity check:', dataIntegrityCheck);
+  console.groupEnd();
+
+  const chartOptions: ChartOptions<'line'> = {
     responsive: true,
+    maintainAspectRatio: false,
     plugins: {
       legend: {
-        position: 'top' as const,
-      },
-      title: {
         display: true,
-        text: 'Weekly Calorie Summary'
+        position: 'top' as const,
+        align: 'center' as const,
+        labels: {
+          usePointStyle: true,
+          padding: 20,
+          font: {
+            size: 12
+          },
+          color: '#333',
+          boxWidth: 8,
+          boxHeight: 8
+        }
+      },
+      tooltip: {
+        mode: 'index',
+        intersect: false,
+        backgroundColor: 'rgba(255, 255, 255, 0.9)',
+        titleColor: '#333',
+        bodyColor: '#666',
+        borderColor: '#ddd',
+        borderWidth: 1,
+        padding: 10,
+        boxPadding: 5,
+        usePointStyle: true,
+        callbacks: {
+          label: function(context) {
+            let label = context.dataset.label || '';
+            if (label) {
+              label += ': ';
+            }
+            if (context.parsed.y !== null) {
+              label += context.parsed.y.toLocaleString() + ' cal';
+            }
+            return label;
+          }
+        }
       }
     },
     scales: {
       y: {
         beginAtZero: true,
-        title: {
-          display: true,
-          text: 'Calories'
+        grid: {
+          color: 'rgba(0, 0, 0, 0.05)'
+        },
+        ticks: {
+          callback: function(value) {
+            return value.toLocaleString() + ' cal';
+          }
+        }
+      },
+      x: {
+        grid: {
+          display: false
         }
       }
     }
   };
 
-  const weeklyStats = weeklyData.length > 0 ? {
-    avgNet: Math.round(weeklyData.reduce((sum, day) => sum + day.netCalories, 0) / weeklyData.length),
-    avgConsumed: Math.round(weeklyData.reduce((sum, day) => sum + day.totalConsumed, 0) / weeklyData.length),
-    avgBurned: Math.round(weeklyData.reduce((sum, day) => sum + day.totalBurned, 0) / weeklyData.length),
-    daysOnTarget: weeklyData.filter(day => {
-      const target = parseInt(editedTargetCalories) || 2000;
-      return day.netCalories <= target && day.netCalories >= target * 0.9;
-    }).length
-  } : {
-    avgNet: 0,
-    avgConsumed: 0,
-    avgBurned: 0,
-    daysOnTarget: 0
-  };
-
   return (
     <div className="container">
-      <h2>Profile</h2>
+      <h2>Your Profile</h2>
+      
+      {isNewUser && (
+        <div className="welcome-message">
+          <h3>Welcome to Apollo Calorie Tracker!</h3>
+          <p>Please take a moment to update your profile information. 
+          This will help us personalize your experience and set your daily calorie targets.</p>
+        </div>
+      )}
+      
       {error && <div className="error">{error}</div>}
       {success && <div className="success">{success}</div>}
-
+      
       {isLoading ? (
         <div className="loading-message">Loading profile data...</div>
       ) : (
@@ -208,8 +480,8 @@ export default function Profile() {
             <div className="profile-header">
               <h3>Profile Information</h3>
               {!isEditing && (
-                <button onClick={handleEdit} className="edit-button">
-                  Edit Profile
+                <button onClick={handleEdit} className="edit-button" title="Edit Profile">
+                  <i className="material-icons">edit</i>
                 </button>
               )}
             </div>
@@ -248,13 +520,34 @@ export default function Profile() {
                 )}
               </div>
 
+              <div className="profile-field">
+                <span className="field-label">Timezone:</span>
+                {isEditing ? (
+                  <select
+                    value={editedTimezone}
+                    onChange={(e) => setEditedTimezone(e.target.value)}
+                    className="inline-edit-input"
+                  >
+                    {COMMON_TIMEZONES.map((tz) => (
+                      <option key={tz.value} value={tz.value}>
+                        {tz.label}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <span className="field-value">
+                    {COMMON_TIMEZONES.find(tz => tz.value === profile?.timezone)?.label || profile?.timezone}
+                  </span>
+                )}
+              </div>
+
               {isEditing && (
                 <div className="profile-actions">
-                  <button onClick={handleSave} className="save-button">
-                    Save Changes
+                  <button onClick={handleSave} className="save-button" title="Save Changes">
+                    <i className="material-icons">check</i>
                   </button>
-                  <button onClick={handleCancel} className="cancel-button">
-                    Cancel
+                  <button onClick={handleCancel} className="cancel-button" title="Cancel">
+                    <i className="material-icons">close</i>
                   </button>
                 </div>
               )}

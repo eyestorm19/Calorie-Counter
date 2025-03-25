@@ -1,13 +1,14 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { useDate } from '../contexts/DateContext';
 import { db } from '../config/firebase';
-import { doc, getDoc, setDoc, Timestamp } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, Timestamp } from 'firebase/firestore';
 import type { Activity, DailyData, UserProfile } from '../types';
 import ChatInput from '../components/ChatInput';
 
 export default function Track() {
   const { user } = useAuth();
-  const [activities, setActivities] = useState<Activity[]>([]);
+  const { dbKey, formattedDate, isNewDay } = useDate();
   const [newActivity, setNewActivity] = useState('');
   const [calories, setCalories] = useState('');
   const [isBurn, setIsBurn] = useState(false);
@@ -15,26 +16,135 @@ export default function Track() {
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [editingActivity, setEditingActivity] = useState<Activity | null>(null);
   const [animatedNetCalories, setAnimatedNetCalories] = useState(0);
+  const [todayData, setTodayData] = useState<DailyData>({
+    activities: [],
+    totalConsumed: 0,
+    totalBurned: 0,
+    netCalories: 0,
+    deficitToTarget: 2000,
+    date: ''
+  });
+  const [editActivity, setEditActivity] = useState<Activity | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editCalories, setEditCalories] = useState('');
+
+  // Add effect to log state changes
+  useEffect(() => {
+    console.log('🔄 todayData state updated:', {
+      activities: todayData.activities,
+      totalConsumed: todayData.totalConsumed,
+      totalBurned: todayData.totalBurned,
+      netCalories: todayData.netCalories,
+      date: todayData.date
+    });
+  }, [todayData]);
+
+  // Add effect to log activities being rendered
+  useEffect(() => {
+    console.log('🎯 Activities being rendered:', {
+      activitiesCount: todayData.activities.length,
+      activities: todayData.activities.map(activity => ({
+        id: activity.id,
+        name: activity.name,
+        calories: activity.calories,
+        type: activity.type,
+        timestamp: activity.timestamp
+      }))
+    });
+  }, [todayData.activities]);
 
   const targetCalories = userProfile?.targetCalories || 2000;
-  const consumedCalories = activities.reduce((sum, a) => a.type === 'consume' ? sum + a.calories : sum, 0);
-  const burnedCalories = activities.reduce((sum, a) => a.type === 'burn' ? sum + a.calories : sum, 0);
-  const netCalories = consumedCalories - burnedCalories;
 
+  // Add utility function to calculate totals
+  const calculateTotals = (activities: Activity[]) => {
+    console.log('🔢 Calculating totals for activities:', activities);
+    
+    const consumed = activities
+      .filter(a => a.type === 'consume')
+      .reduce((sum, a) => {
+        console.log(`➕ Adding consumed calories for ${a.name}: ${a.calories}`);
+        return sum + a.calories;
+      }, 0);
+    
+    const burned = activities
+      .filter(a => a.type === 'burn')
+      .reduce((sum, a) => {
+        console.log(`➖ Adding burned calories for ${a.name}: ${a.calories}`);
+        return sum + a.calories;
+      }, 0);
+    
+    const net = consumed - burned;
+    const deficit = targetCalories - net;
+    
+    console.log('📊 Final calculations:', {
+      totalConsumed: consumed,
+      totalBurned: burned,
+      netCalories: net,
+      deficitToTarget: deficit
+    });
+    
+    return {
+      totalConsumed: consumed,
+      totalBurned: burned,
+      netCalories: net,
+      deficitToTarget: deficit
+    };
+  };
+
+  // Add function to sync data with Firebase
+  const syncWithFirebase = async (activities: Activity[], dateKey: string) => {
+    if (!user) return;
+
+    try {
+      console.log('🔄 Starting sync with Firebase for date:', dateKey);
+      console.log('📦 Activities to sync:', activities);
+      
+      const docRef = doc(db, 'users', user.uid, 'dailyLogs', dateKey);
+      const updatedTotals = calculateTotals(activities);
+      
+      const dailyData: DailyData = {
+        activities,
+        ...updatedTotals,
+        date: dateKey
+      };
+
+      console.log('💾 Saving to Firebase:', dailyData);
+      // Update Firebase
+      await setDoc(docRef, dailyData);
+      
+      // Update local state
+      setTodayData(dailyData);
+      console.log('✅ Sync completed successfully');
+    } catch (err) {
+      console.error('❌ Error syncing with Firebase:', err);
+      setError('Failed to sync data');
+    }
+  };
+
+  // Load data when user is available or date changes
   useEffect(() => {
     if (user) {
+      console.log('👤 User available, loading profile and data');
       loadUserProfile();
       loadTodayData();
     }
-  }, [user]);
+  }, [user, dbKey]); // Reload when date changes
+
+  // Reload data when isNewDay is true
+  useEffect(() => {
+    if (isNewDay && user) {
+      console.log('🔄 New day detected, reloading data');
+      loadTodayData();
+    }
+  }, [isNewDay]);
 
   useEffect(() => {
     setAnimatedNetCalories(0);
     const timer = setTimeout(() => {
-      setAnimatedNetCalories(netCalories);
+      setAnimatedNetCalories(todayData.netCalories);
     }, 100);
     return () => clearTimeout(timer);
-  }, [netCalories]);
+  }, [todayData.netCalories]);
 
   const loadUserProfile = async () => {
     if (!user) return;
@@ -47,86 +157,157 @@ export default function Track() {
 
   const loadTodayData = async () => {
     if (!user) {
-      console.log('No user found in loadTodayData');
+      console.log('❌ No user found in loadTodayData');
       return;
     }
     try {
-      const today = new Date().toISOString().split('T')[0];
-      const docPath = `${user.uid}_${today}`;
-      const docRef = doc(db, 'dailyData', docPath);
+      console.log('📥 Starting to load today data');
       
-      console.log('Loading today data:', {
-        path: docPath,
-        user: {
-          uid: user.uid,
-          email: user.email,
-          isAuthenticated: !!user,
-          token: user.refreshToken
-        }
+      // Get today's date from context
+      const today = new Date(dbKey);
+      const todayKey = today.toISOString().split('T')[0];
+      
+      // New path: users/{userId}/dailyLogs/{date}
+      const docRef = doc(db, 'users', user.uid, 'dailyLogs', todayKey);
+      
+      console.log('🔍 Fetching data from Firebase:', {
+        path: `users/${user.uid}/dailyLogs/${todayKey}`,
+        date: todayKey
       });
 
       const docSnap = await getDoc(docRef);
+
       if (docSnap.exists()) {
         const data = docSnap.data() as DailyData;
-        console.log('Loaded data:', data);
-        setActivities(data.activities);
+        console.log('📦 Data received from Firebase:', {
+          date: data.date,
+          activitiesCount: data.activities?.length || 0,
+          totalConsumed: data.totalConsumed,
+          totalBurned: data.totalBurned,
+          netCalories: data.netCalories,
+          activities: data.activities // Log activities to check structure
+        });
+        
+        // Only set data if it's from today
+        if (data.date === todayKey) {
+          console.log('✅ Setting today data in local state');
+          // Log raw activities to check types
+          console.log('🔍 Raw activities from Firebase:', data.activities);
+          
+          // Ensure activities have the correct structure
+          const processedData = {
+            ...data,
+            activities: data.activities?.map(activity => {
+              console.log('📦 Processing activity:', activity);
+              return {
+                ...activity,
+                id: activity.id || `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                timestamp: activity.timestamp || Timestamp.now(),
+                name: activity.name || '',
+                calories: activity.calories || 0,
+                type: (activity.type === 'burn' ? 'burn' : 'consume') as 'consume' | 'burn'
+              };
+            }) || []
+          };
+          console.log('✨ Processed activities:', processedData.activities);
+          setTodayData(processedData);
+        } else {
+          console.log('🔄 Creating new document for today as existing data is from:', data.date);
+          // If data exists but is from a different day, create new document
+          const newDailyData: DailyData = {
+            activities: [],
+            totalConsumed: 0,
+            totalBurned: 0,
+            netCalories: 0,
+            deficitToTarget: targetCalories,
+            date: todayKey
+          };
+          await setDoc(docRef, newDailyData);
+          console.log('✨ Initialized new daily data in Firebase and local state');
+          setTodayData(newDailyData);
+        }
       } else {
-        console.log('No data exists for today, will create new document');
+        console.log('📝 No data exists for today, creating new document');
+        const newDailyData: DailyData = {
+          activities: [],
+          totalConsumed: 0,
+          totalBurned: 0,
+          netCalories: 0,
+          deficitToTarget: targetCalories,
+          date: todayKey
+        };
+        await setDoc(docRef, newDailyData);
+        console.log('✨ Initialized new daily data in Firebase and local state');
+        setTodayData(newDailyData);
       }
     } catch (err) {
-      console.error('Error loading today data:', err);
+      console.error('❌ Error loading today data:', err);
       if (err instanceof Error) {
         const firebaseError = err as any;
         console.error('Error details:', {
           message: err.message,
           name: err.name,
-          code: firebaseError.code,
-          stack: err.stack
+          code: firebaseError.code
         });
       }
     }
   };
 
-  const handleEdit = (activity: Activity) => {
-    console.log('Editing activity:', activity);
-    setEditingActivity(activity);
-    setNewActivity(activity.name);
-    setCalories(activity.calories.toString());
+  const handleEdit = async (activity: Activity) => {
+    console.log('✏️ Editing activity:', activity);
+    setEditActivity(activity);
+    setEditName(activity.name);
+    setEditCalories(activity.type === 'burn' ? `-${activity.calories}` : activity.calories.toString());
     setIsBurn(activity.type === 'burn');
+  };
+
+  const handleEditSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editActivity) return;
+
+    try {
+      const caloriesValue = parseInt(editCalories);
+      const updatedActivity: Activity = {
+        ...editActivity,
+        name: editName,
+        calories: Math.abs(caloriesValue),
+        type: caloriesValue < 0 ? 'burn' : 'consume'
+      };
+
+      const updatedActivities = todayData.activities.map(activity =>
+        activity.id === editActivity.id ? updatedActivity : activity
+      );
+
+      setTodayData({
+        ...todayData,
+        activities: updatedActivities
+      });
+      setEditActivity(null);
+      setEditName('');
+      setEditCalories('');
+      await syncWithFirebase(updatedActivities, todayData.date);
+    } catch (error) {
+      console.error('Error updating activity:', error);
+      setError('Failed to update activity');
+    }
   };
 
   const handleDelete = async (activityId: string) => {
     if (!user) return;
     
     try {
-      const today = new Date().toISOString().split('T')[0];
-      const docPath = `${user.uid}_${today}`;
-      const docRef = doc(db, 'dailyData', docPath);
+      console.log('🗑️ Starting activity deletion');
+      const today = new Date(dbKey);
+      const todayKey = today.toISOString().split('T')[0];
 
-      const updatedActivities = activities.filter(a => a.id !== activityId);
-      const updatedConsumed = updatedActivities
-        .filter(a => a.type === 'consume')
-        .reduce((sum, a) => sum + a.calories, 0);
-      const updatedBurned = updatedActivities
-        .filter(a => a.type === 'burn')
-        .reduce((sum, a) => sum + a.calories, 0);
-      const updatedNet = updatedConsumed - updatedBurned;
-      const deficitToTarget = targetCalories - updatedNet;
-
-      const dailyData: DailyData = {
-        activities: updatedActivities,
-        totalConsumed: updatedConsumed,
-        totalBurned: updatedBurned,
-        netCalories: updatedNet,
-        deficitToTarget,
-        date: today
-      };
-
-      await setDoc(docRef, dailyData);
-      setActivities(updatedActivities);
+      // Remove the activity and recalculate all totals
+      const updatedActivities = todayData.activities.filter(a => a.id !== activityId);
+      console.log('📦 Activities after deletion:', updatedActivities);
+      await syncWithFirebase(updatedActivities, todayKey);
+      console.log('✅ Deletion completed successfully');
     } catch (err) {
-      console.error('Error deleting activity:', err);
-      setError('Failed to delete activity. Please try again.');
+      console.error('❌ Error deleting activity:', err);
+      setError('Failed to delete activity');
     }
   };
 
@@ -134,192 +315,155 @@ export default function Track() {
     if (!user) return;
 
     try {
-      setError('');
-      const today = new Date().toISOString().split('T')[0];
-      const docPath = `${user.uid}_${today}`;
-      const docRef = doc(db, 'dailyData', docPath);
-
-      const docSnap = await getDoc(docRef);
-      let currentActivities = activities;
-      if (docSnap.exists()) {
-        const data = docSnap.data() as DailyData;
-        currentActivities = data.activities;
-      }
+      console.log('➕ Starting new activity addition');
+      const today = new Date(dbKey);
+      const todayKey = today.toISOString().split('T')[0];
 
       const newActivity: Activity = {
-        id: Date.now().toString(),
+        id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         ...activityData,
         timestamp: Timestamp.now()
       };
 
-      const updatedActivities = [...currentActivities, newActivity];
-      const updatedConsumed = updatedActivities
-        .filter(a => a.type === 'consume')
-        .reduce((sum, a) => sum + a.calories, 0);
-      const updatedBurned = updatedActivities
-        .filter(a => a.type === 'burn')
-        .reduce((sum, a) => sum + a.calories, 0);
-      const updatedNet = updatedConsumed - updatedBurned;
-      const deficitToTarget = targetCalories - updatedNet;
-
-      const dailyData: DailyData = {
-        activities: updatedActivities,
-        totalConsumed: updatedConsumed,
-        totalBurned: updatedBurned,
-        netCalories: updatedNet,
-        deficitToTarget,
-        date: today
-      };
-
-      await setDoc(docRef, dailyData);
-      setActivities(updatedActivities);
+      console.log('📦 New activity to add:', newActivity);
+      // Add new activity and recalculate all totals
+      const updatedActivities = [...todayData.activities, newActivity];
+      await syncWithFirebase(updatedActivities, todayKey);
+      console.log('✅ Activity addition completed successfully');
     } catch (err) {
-      console.error('Error adding activity:', err);
+      console.error('❌ Error adding activity:', err);
       setError('Failed to add activity');
     }
   };
 
+  // Add effect to recalculate when target calories change
+  useEffect(() => {
+    if (user && todayData.activities.length > 0) {
+      const today = new Date(dbKey);
+      const todayKey = today.toISOString().split('T')[0];
+      syncWithFirebase(todayData.activities, todayKey);
+    }
+  }, [targetCalories]);
+
   return (
     <div className="container">
-      <h2>Track Calories</h2>
-      {error && <div className="error">{error}</div>}
-
-      <ChatInput onActivityAdd={handleActivityAdd} />
-
-      <div className="calorie-progress">
-        <h3>Today's Progress</h3>
-        <div className="progress-container">
-          <div className="progress-bar-wrapper">
-            {/* Net calories marker above */}
-            <div className="progress-markers-top">
-              <span 
-                className={`marker current ${animatedNetCalories > 0 ? 'positive' : 'negative'}`}
-                style={{
-                  left: `${animatedNetCalories < 0 
-                    ? 50 - (Math.abs(animatedNetCalories) / (Math.max(targetCalories, Math.abs(netCalories))) * 50) 
-                    : Math.min(100, 50 + (animatedNetCalories / targetCalories * 50))}%`
-                }}
-              >
-                {netCalories}
-              </span>
-            </div>
-            {/* Background bar showing target range */}
-            <div className="progress-background">
-              <div className="target-range" style={{ width: '50%', left: '50%' }} />
-            </div>
-            {/* Progress bar */}
-            {netCalories !== 0 && (
-              <div 
-                className={`progress-fill ${animatedNetCalories > 0 ? 'positive' : 'negative'}`}
-                style={{
-                  left: animatedNetCalories < 0 ? 'auto' : '50%',
-                  right: animatedNetCalories < 0 ? '50%' : 'auto',
-                  width: `${animatedNetCalories < 0 
-                    ? Math.abs(animatedNetCalories) / (Math.max(targetCalories, Math.abs(netCalories))) * 50
-                    : Math.min(50, (animatedNetCalories / targetCalories) * 50)}%`
-                }}
-              />
-            )}
-            {/* Zero and target markers below */}
-            <div className="progress-markers-bottom">
-              <div className="marker-line" style={{ left: '50%' }} />
-              <div className="marker-line" style={{ left: '100%' }} />
-              <span className="marker zero">0</span>
-              <span className="marker target">Target: {targetCalories}</span>
-            </div>
+      <div className="persistent-header">
+        <div className="header-summary">
+          <div className="summary-main">
+            <h3 className="date-display">{formattedDate}</h3>
+            <span className={`net-calories ${todayData.netCalories < targetCalories ? 'below-target' : 'above-target'}`}>
+              {todayData.netCalories} / {targetCalories} kcal
+            </span>
           </div>
-          <div className="progress-details">
-            <div className="detail-item">
-              <span className="detail-label">Consumed</span>
-              <span className="detail-value">{consumedCalories}</span>
-            </div>
-            <div className="detail-item">
-              <span className="detail-label">Burned</span>
-              <span className="detail-value">{burnedCalories}</span>
-            </div>
+          <div className="summary-details">
+            <span className="calorie-detail consumed">
+              <span className="detail-label">Consumed:</span> 
+              <span className="detail-value">+{todayData.totalConsumed} kcal</span>
+            </span>
+            <span className="calorie-detail burned">
+              <span className="detail-label">Burned:</span> 
+              <span className="detail-value">-{todayData.totalBurned} kcal</span>
+            </span>
           </div>
         </div>
+      </div>
+      
+      {error && <div className="error">{error}</div>}
+
+      <div className="chat-section">
+        <ChatInput 
+          onActivityAdd={handleActivityAdd} 
+          currentStats={{
+            netCalories: todayData.netCalories,
+            consumedCalories: todayData.totalConsumed,
+            burnedCalories: todayData.totalBurned,
+            targetCalories: targetCalories
+          }}
+        />
       </div>
 
       <div className="activities-list">
         <h3>Today's Activities</h3>
-        {activities.length === 0 ? (
+        {todayData.activities.length === 0 ? (
           <p>No activities recorded for today</p>
         ) : (
           <ul>
-            {[...activities]
+            {[...todayData.activities]
               .sort((a, b) => b.timestamp.seconds - a.timestamp.seconds)
-              .map((activity) => (
-              <li key={activity.id} className="activity-item">
-                {editingActivity?.id === activity.id ? (
-                  <div className="activity-edit">
-                    <div className="edit-fields">
-                      <input
-                        type="text"
-                        value={newActivity}
-                        onChange={(e) => setNewActivity(e.target.value)}
-                        className="edit-input"
-                      />
-                      <input
-                        type="number"
-                        value={calories}
-                        onChange={(e) => setCalories(e.target.value)}
-                        className="edit-input"
-                      />
-                      <label className="burn-checkbox">
+              .map((activity) => {
+                console.log('📝 Rendering activity:', {
+                  id: activity.id,
+                  name: activity.name,
+                  calories: activity.calories,
+                  type: activity.type,
+                  timestamp: activity.timestamp
+                });
+                return (
+                <li key={`activity-${activity.id}`} className="activity-item">
+                  <div className="activity-info">
+                    <div className="activity-details">
+                      {editActivity?.id === activity.id ? (
                         <input
-                          type="checkbox"
-                          checked={isBurn}
-                          onChange={(e) => setIsBurn(e.target.checked)}
+                          type="text"
+                          value={editName}
+                          onChange={(e) => setEditName(e.target.value)}
+                          className="edit-input"
+                          placeholder="Activity name"
+                          required
+                          autoFocus
                         />
-                        Burn
-                      </label>
-                    </div>
-                    <div className="edit-actions">
-                      <button 
-                        onClick={() => {
-                          setEditingActivity(null);
-                          setNewActivity('');
-                          setCalories('');
-                          setIsBurn(false);
-                        }}
-                        className="cancel-button"
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <>
-                    <div className="activity-info">
-                      <div className="activity-details">
-                        <span className="activity-name">{activity.name}</span>
-                        <span className="activity-time">
-                          {new Date(activity.timestamp.seconds * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                        </span>
-                      </div>
-                      <span className={`calorie-value ${activity.type === 'burn' ? 'burned' : 'consumed'}`}>
-                        {activity.type === 'burn' ? '-' : '+'}{activity.calories} cal
+                      ) : (
+                        <span className="activity-name">{activity.name || 'Unnamed Activity'}</span>
+                      )}
+                      <span className="activity-time">
+                        {new Date(activity.timestamp.seconds * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                       </span>
                     </div>
-                    <div className="activity-actions">
-                      <button 
-                        onClick={() => handleEdit(activity)}
-                        className="edit-button"
-                      >
-                        Edit
-                      </button>
-                      <button 
-                        onClick={() => handleDelete(activity.id)}
-                        className="delete-button"
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  </>
-                )}
-              </li>
-            ))}
+                    {editActivity?.id === activity.id ? (
+                      <input
+                        type="number"
+                        value={editCalories}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          // Allow empty value or numbers with optional negative sign
+                          if (value === '' || /^-?\d*$/.test(value)) {
+                            setEditCalories(value);
+                          }
+                        }}
+                        className="edit-input"
+                        placeholder="Calories (positive for consumed, negative for burned)"
+                        required
+                      />
+                    ) : (
+                      <span className={`calorie-value ${activity.type === 'burn' ? 'burned' : 'consumed'}`}>
+                        {activity.type === 'burn' ? '-' : '+'}{activity.calories || 0} cal
+                      </span>
+                    )}
+                  </div>
+                  <div className="activity-actions">
+                    {editActivity?.id === activity.id ? (
+                      <>
+                        <button type="submit" className="submit-button" onClick={handleEditSubmit} title="Save">
+                          <i className="material-icons">check</i>
+                        </button>
+                        <button type="button" className="cancel-button" onClick={() => setEditActivity(null)} title="Cancel">
+                          <i className="material-icons">close</i>
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <button className="edit-button" onClick={() => handleEdit(activity)} title="Edit activity">
+                          <i className="material-icons">edit</i>
+                        </button>
+                        <button className="delete-button" onClick={() => handleDelete(activity.id)} title="Delete activity">
+                          <i className="material-icons">delete</i>
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </li>
+              )}
+            )}
           </ul>
         )}
       </div>

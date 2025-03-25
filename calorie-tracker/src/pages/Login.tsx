@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -7,8 +7,20 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const { signIn } = useAuth();
+  const [googleLoading, setGoogleLoading] = useState(false);
+  const { signIn, signInWithGoogle, isNewUser, user } = useAuth();
   const navigate = useNavigate();
+  
+  // Redirect based on user status
+  useEffect(() => {
+    if (user) {
+      if (isNewUser) {
+        navigate('/profile');
+      } else {
+        navigate('/track');
+      }
+    }
+  }, [isNewUser, navigate, user]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -16,7 +28,7 @@ export default function Login() {
       setError('');
       setLoading(true);
       await signIn(email, password);
-      navigate('/track');
+      // Redirection is handled by the useEffect hook
     } catch (err) {
       setError('Failed to sign in');
     } finally {
@@ -24,9 +36,22 @@ export default function Login() {
     }
   };
 
+  const handleGoogleSignIn = async () => {
+    try {
+      setError('');
+      setGoogleLoading(true);
+      await signInWithGoogle();
+      // Redirection is handled by the useEffect hook
+    } catch (err) {
+      setError('Failed to sign in with Google');
+    } finally {
+      setGoogleLoading(false);
+    }
+  };
+
   return (
-    <div className="container">
-      <h2>Login</h2>
+    <div className="auth-container">
+      <h2>Welcome Back</h2>
       {error && <div className="error">{error}</div>}
       <form onSubmit={handleSubmit}>
         <div className="form-group">
@@ -36,6 +61,7 @@ export default function Login() {
             id="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
+            placeholder="Enter your email"
             required
           />
         </div>
@@ -46,6 +72,7 @@ export default function Login() {
             id="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
+            placeholder="Enter your password"
             required
           />
         </div>
@@ -53,6 +80,21 @@ export default function Login() {
           {loading ? 'Logging in...' : 'Login'}
         </button>
       </form>
+      
+      <div className="auth-divider">
+        <span>OR</span>
+      </div>
+      
+      <button 
+        type="button" 
+        className="google-sign-in-button"
+        onClick={handleGoogleSignIn}
+        disabled={googleLoading}
+      >
+        <span className="google-icon"></span>
+        {googleLoading ? 'Signing in...' : 'Sign in with Google'}
+      </button>
+      
       <p>
         Don't have an account? <Link to="/register">Register</Link>
       </p>

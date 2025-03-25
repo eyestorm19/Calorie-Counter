@@ -11,9 +11,15 @@ interface Message {
 
 interface ChatInputProps {
   onActivityAdd: (activity: Omit<Activity, 'id' | 'timestamp'>) => void;
+  currentStats?: {
+    netCalories: number;
+    consumedCalories: number;
+    burnedCalories: number;
+    targetCalories: number;
+  };
 }
 
-export default function ChatInput({ onActivityAdd }: ChatInputProps) {
+export default function ChatInput({ onActivityAdd, currentStats }: ChatInputProps) {
   const [message, setMessage] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [messages, setMessages] = useState<Message[]>([{
@@ -101,7 +107,8 @@ Input: "${message}"`,
         };
         setMessages(prev => [...prev, assistantMessage]);
         if (activityData.isActivityUpdate) {
-          onActivityAdd(activityData);
+          const { isActivityUpdate, ...activityToAdd } = activityData;
+          onActivityAdd(activityToAdd);
         }
         setMessage('');
       } catch (err) {
@@ -160,7 +167,26 @@ Input: "${message}"`,
           className="chat-submit"
           disabled={isProcessing || !message.trim()}
         >
-          {isProcessing ? 'Processing...' : 'Send'}
+          {isProcessing ? (
+            <div className="thinking-icon" />
+          ) : (
+            <div className="send-icon">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                width="20"
+                height="20"
+              >
+                <line x1="22" y1="2" x2="11" y2="13"></line>
+                <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+              </svg>
+            </div>
+          )}
         </button>
       </form>
     </div>

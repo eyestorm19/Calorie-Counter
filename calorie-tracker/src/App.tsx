@@ -1,24 +1,25 @@
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { AuthProvider } from './contexts/AuthContext';
+import { DateProvider } from './contexts/DateContext';
+import PrivateRoute from './components/PrivateRoute';
 import Navbar from './components/Navbar';
+import BackgroundElements from './components/BackgroundElements';
 import Home from './pages/Home';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Track from './pages/Track';
 import Profile from './pages/Profile';
 
-function PrivateRoute({ children }: { children: React.ReactNode }) {
-  const { user } = useAuth();
-  return user ? <>{children}</> : <Navigate to="/login" />;
-}
-
 function App() {
+  const appMode = import.meta.env.VITE_APP_MODE || 'production';
+
   return (
     <Router>
       <AuthProvider>
-        <div className="app">
-          <Navbar />
-          <main>
+        <DateProvider>
+          <div className="app" data-env={appMode}>
+            <BackgroundElements />
+            <Navbar />
             <Routes>
               <Route path="/" element={<Home />} />
               <Route path="/login" element={<Login />} />
@@ -40,8 +41,8 @@ function App() {
                 }
               />
             </Routes>
-          </main>
-        </div>
+          </div>
+        </DateProvider>
       </AuthProvider>
     </Router>
   );

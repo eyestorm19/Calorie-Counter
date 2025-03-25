@@ -22,4 +22,5 @@ export interface UserProfile {
   targetCalories: number;
   createdAt: Timestamp;
   updatedAt: Timestamp;
+  timezone: string;  // User's timezone (e.g., 'America/New_York')
 } 

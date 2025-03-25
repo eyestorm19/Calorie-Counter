@@ -20,4 +20,7 @@ export interface UserProfile {
   name: string;
   email: string;
   targetCalories: number;
+  timezone: string;
+  createdAt: Date;
+  updatedAt: Date;
 } 

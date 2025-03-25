@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 export default function Navbar() {
   const { user, logout } = useAuth();
   const location = useLocation();
+  const appName = import.meta.env.VITE_APP_NAME || 'Apollo';
 
   const isActive = (path: string) => location.pathname === path;
 
@@ -12,7 +13,7 @@ export default function Navbar() {
   return (
     <nav className="navbar">
       <div className="navbar-brand">
-        <Link to="/">Calorie Tracker</Link>
+        <Link to="/">{appName}</Link>
       </div>
       <div className="navbar-menu">
         <div className="navbar-end">
