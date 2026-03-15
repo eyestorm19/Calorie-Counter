@@ -10,6 +10,8 @@ A modern, responsive web application for tracking daily calorie consumption and 
 - 📈 Weekly summary with charts and statistics
 - ⚙️ Customizable user profiles with timezone settings
 - 🎯 Set and track daily calorie targets
+- 🤖 AI-powered activity logging with natural language processing
+- 💰 Pay-as-you-go cloud deployment options
 
 ## Getting Started
 
@@ -47,6 +49,60 @@ A modern, responsive web application for tracking daily calorie consumption and 
    # or
    yarn dev
    ```
+
+## AI Setup
+
+Apollo uses [Ollama](https://ollama.com/) for natural language processing of food and activity inputs. There are three setup options:
+
+### Development Setup
+
+In development mode, Apollo connects to a locally running Ollama instance:
+
+1. Install Ollama from [ollama.com/download](https://ollama.com/download)
+2. Start Ollama: `ollama serve`
+3. Install required models with our helper script:
+   ```bash
+   chmod +x scripts/ollama-setup.sh
+   ./scripts/ollama-setup.sh
+   ```
+   Alternatively, you can manually install models:
+   ```bash
+   ollama pull mistral   # Default model
+   ollama pull llama2    # Optional: Meta's LLama2 model 
+   ollama pull distilbert # Optional: Smaller, faster model
+   ```
+4. Run Apollo in development mode: `npm run dev`
+
+The app will automatically connect to the local Ollama instance at `http://localhost:11434`. You can switch between different models using the model selector at the top of the chat interface.
+
+### Google Cloud Run Setup (Recommended for Production)
+
+For a scalable, pay-as-you-go deployment with zero idle costs, we provide an automated setup for Google Cloud Run:
+
+1. Run the provided setup script:
+   ```bash
+   chmod +x scripts/setup-ollama-cloud-run.sh
+   ./scripts/setup-ollama-cloud-run.sh
+   ```
+
+2. Follow the interactive prompts to deploy Ollama to Cloud Run
+
+3. Deploy your updated app to Firebase:
+   ```bash
+   ./deploy.sh
+   ```
+
+For detailed setup instructions and cost estimates, see [CLOUD_RUN_OLLAMA.md](CLOUD_RUN_OLLAMA.md).
+
+### Traditional Server Setup
+
+Alternatively, you can install Ollama on your own web server:
+
+1. Install Ollama on your web server
+2. Start Ollama as a service: `ollama serve`
+3. Pull the Mistral model: `ollama pull mistral`
+4. Update the Firebase Function in `functions/index.js` to point to your Ollama server
+5. Deploy the Firebase Function: `firebase deploy --only functions`
 
 ## Deployment
 
@@ -130,3 +186,59 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 - [Firebase](https://firebase.google.com/)
 - [Vite](https://vitejs.dev/)
 - [Chart.js](https://www.chartjs.org/)
+- [Ollama](https://ollama.com/) - Local AI processing
+
+# React + TypeScript + Vite
+
+This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+
+Currently, two official plugins are available:
+
+- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react/README.md) uses [Babel](https://babeljs.io/) for Fast Refresh
+- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+
+## Expanding the ESLint configuration
+
+If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+
+```js
+export default tseslint.config({
+  extends: [
+    // Remove ...tseslint.configs.recommended and replace with this
+    ...tseslint.configs.recommendedTypeChecked,
+    // Alternatively, use this for stricter rules
+    ...tseslint.configs.strictTypeChecked,
+    // Optionally, add this for stylistic rules
+    ...tseslint.configs.stylisticTypeChecked,
+  ],
+  languageOptions: {
+    // other options...
+    parserOptions: {
+      project: ['./tsconfig.node.json', './tsconfig.app.json'],
+      tsconfigRootDir: import.meta.dirname,
+    },
+  },
+})
+```
+
+You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+
+```js
+// eslint.config.js
+import reactX from 'eslint-plugin-react-x'
+import reactDom from 'eslint-plugin-react-dom'
+
+export default tseslint.config({
+  plugins: {
+    // Add the react-x and react-dom plugins
+    'react-x': reactX,
+    'react-dom': reactDom,
+  },
+  rules: {
+    // other rules...
+    // Enable its recommended typescript rules
+    ...reactX.configs['recommended-typescript'].rules,
+    ...reactDom.configs.recommended.rules,
+  },
+})
+```

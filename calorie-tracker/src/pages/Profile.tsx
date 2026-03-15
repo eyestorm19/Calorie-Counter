@@ -16,6 +16,7 @@ import {
   Legend,
   ChartOptions
 } from 'chart.js';
+import { Link } from 'react-router-dom';
 
 ChartJS.register(
   CategoryScale,
@@ -273,14 +274,14 @@ export default function Profile() {
   };
 
   const handleCancel = () => {
-    if (profile) {
-      setEditedName(profile.name);
-      setEditedTargetCalories(profile.targetCalories.toString());
-      setEditedTimezone(profile.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone);
-    }
     setIsEditing(false);
-    setError('');
-    setSuccess('');
+    resetEditForm();
+  };
+
+  const resetEditForm = () => {
+    setEditedName(profile?.name || '');
+    setEditedTargetCalories(profile?.targetCalories.toString() || '2000');
+    setEditedTimezone(profile?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone);
   };
 
   const handleSave = async () => {
@@ -458,34 +459,40 @@ export default function Profile() {
   };
 
   return (
-    <div className="container">
-      <h2>Your Profile</h2>
-      
-      {isNewUser && (
-        <div className="welcome-message">
-          <h3>Welcome to Apollo Calorie Tracker!</h3>
-          <p>Please take a moment to update your profile information. 
-          This will help us personalize your experience and set your daily calorie targets.</p>
-        </div>
-      )}
-      
-      {error && <div className="error">{error}</div>}
-      {success && <div className="success">{success}</div>}
-      
+    <div className="container profile-container">
       {isLoading ? (
-        <div className="loading-message">Loading profile data...</div>
+        <div className="loading">Loading...</div>
+      ) : error ? (
+        <div className="error-message">{error}</div>
       ) : (
         <>
-          <div className="profile-info">
+          {isNewUser && (
+            <div className="welcome-message">
+              <h3>Welcome to Apollo!</h3>
+              <p>Please take a moment to update your profile information below, especially your daily calorie target.</p>
+            </div>
+          )}
+
+          <div className="profile-card">
             <div className="profile-header">
-              <h3>Profile Information</h3>
+              <h2>Profile</h2>
               {!isEditing && (
                 <button onClick={handleEdit} className="edit-button" title="Edit Profile">
                   <i className="material-icons">edit</i>
                 </button>
               )}
             </div>
+
+            {/* AI capabilities info card */}
+            <div className="ai-info-card">
+              <div className="ai-info-content">
+                <h3>🧠 AI-Powered Tracking</h3>
+                <p>Apollo uses AI to automatically log your food and exercise. Simply describe what you ate or did in natural language.</p>
+                <Link to="/help" className="learn-more-link">Learn how it works</Link>
+              </div>
+            </div>
             
+            {/* Rest of profile content */}
             <div className="profile-content">
               <div className="profile-field">
                 <span className="field-label">Name:</span>

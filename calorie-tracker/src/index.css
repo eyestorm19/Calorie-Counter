@@ -2430,3 +2430,561 @@ form p a:hover {
 [data-env="development"] .app-footer {
   border-left: 4px solid var(--primary-color);
 }
+
+/* Add styles for the development badge */
+.development-badge {
+  display: flex;
+  justify-content: center;
+  margin: 10px 0;
+  padding: 6px 12px;
+  background-color: #fff8e1;
+  border: 1px solid #ffd54f;
+  border-radius: 8px;
+  font-size: 14px;
+  color: #ff8f00;
+}
+
+.development-badge span {
+  display: flex;
+  align-items: center;
+}
+
+.development-badge span::before {
+  content: "🛠️";
+  margin-right: 8px;
+}
+
+/* Remove Ollama toggle styles that are no longer needed */
+.ollama-toggle,
+.toggle-switch,
+.toggle-slider,
+.help-link,
+.message-actions,
+.message-link {
+  /* These classes will be kept in the CSS but not used */
+  /* We're keeping them to avoid breaking anything if they're referenced elsewhere */
+  display: none;
+}
+
+/* Help Page Styles */
+.help-page {
+  max-width: 900px;
+  margin: 2rem auto;
+  padding: 2rem;
+  background-color: white;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.help-page h1 {
+  text-align: center;
+  margin-bottom: 2rem;
+  color: var(--primary-color);
+}
+
+.help-section {
+  margin-bottom: 3rem;
+}
+
+.help-section h2 {
+  font-size: 1.6rem;
+  border-bottom: 2px solid var(--light-gray);
+  padding-bottom: 0.5rem;
+  margin-bottom: 1.5rem;
+  color: var(--dark-text);
+}
+
+.section-intro {
+  margin-bottom: 1.5rem;
+  font-size: 1.1rem;
+  line-height: 1.6;
+}
+
+.help-card {
+  background-color: #f8faff;
+  padding: 1.5rem;
+  border-radius: 8px;
+  margin-bottom: 1.5rem;
+  border-left: 4px solid var(--primary-color);
+}
+
+.help-card h3 {
+  margin-top: 0;
+  color: var(--primary-color);
+  font-size: 1.3rem;
+}
+
+.help-card ul, .help-card ol {
+  padding-left: 1.5rem;
+}
+
+.help-card pre {
+  background-color: #f0f2f5;
+  padding: 0.8rem;
+  border-radius: 4px;
+  overflow-x: auto;
+}
+
+.help-card code {
+  font-family: monospace;
+  background-color: #f0f2f5;
+  padding: 0.2rem 0.4rem;
+  border-radius: 4px;
+}
+
+.benefits-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 1.5rem;
+}
+
+.benefit-card {
+  background-color: #f8faff;
+  padding: 1.5rem;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  transition: transform 0.2s ease-in-out;
+}
+
+.benefit-card:hover {
+  transform: translateY(-5px);
+}
+
+.benefit-card h3 {
+  margin-top: 0;
+  color: var(--primary-color);
+  font-size: 1.2rem;
+}
+
+.collapsible-help details {
+  margin-bottom: 1rem;
+}
+
+.collapsible-help summary {
+  cursor: pointer;
+  font-weight: 600;
+  padding: 1rem;
+  background-color: #f5f8ff;
+  border-radius: 6px;
+  transition: background-color 0.2s;
+}
+
+.collapsible-help summary:hover {
+  background-color: #e8f0ff;
+}
+
+.details-content {
+  padding: 1rem;
+  background-color: #fafbff;
+  border-radius: 0 0 6px 6px;
+  margin-top: 2px;
+}
+
+.help-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 3rem;
+  padding-top: 2rem;
+  border-top: 1px solid var(--light-gray);
+}
+
+.text-link {
+  color: var(--primary-color);
+  text-decoration: none;
+}
+
+.text-link:hover {
+  text-decoration: underline;
+}
+
+/* Help tabs styling */
+.help-tabs {
+  margin-bottom: 2rem;
+}
+
+.tab-headers {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.tab-button {
+  padding: 0.75rem 1.25rem;
+  border: none;
+  background-color: #f0f2f5;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  transition: all 0.2s;
+}
+
+.tab-button.active {
+  background-color: var(--primary-color);
+  color: white;
+}
+
+.tab-button:hover:not(.active) {
+  background-color: #e0e4e9;
+}
+
+.tab-button i {
+  font-size: 1.2rem;
+}
+
+.tab-content {
+  display: none;
+  padding: 1.5rem;
+  background-color: #f8faff;
+  border-radius: 8px;
+  border-left: 4px solid var(--primary-color);
+}
+
+.tab-content.active {
+  display: block;
+}
+
+.steps-list {
+  list-style: none;
+  padding: 0;
+  margin: 1.5rem 0;
+}
+
+.steps-list li {
+  display: flex;
+  margin-bottom: 2rem;
+  position: relative;
+}
+
+.steps-list li:last-child {
+  margin-bottom: 0;
+}
+
+.step-number {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  background-color: var(--primary-color);
+  color: white;
+  border-radius: 50%;
+  margin-right: 1rem;
+  font-weight: bold;
+  flex-shrink: 0;
+}
+
+.step-content {
+  flex: 1;
+}
+
+.step-content h4 {
+  margin-top: 0;
+  margin-bottom: 0.5rem;
+  color: var(--dark-text);
+}
+
+.help-image {
+  margin: 1rem 0;
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid #e0e4e9;
+}
+
+.help-image img {
+  max-width: 100%;
+  display: block;
+}
+
+.note {
+  font-style: italic;
+  color: #666;
+  margin-top: 0.5rem;
+  font-size: 0.9rem;
+}
+
+@media (max-width: 768px) {
+  .help-page {
+    padding: 1.5rem;
+    margin: 1rem;
+  }
+  
+  .tab-headers {
+    flex-wrap: wrap;
+  }
+  
+  .tab-button {
+    flex: 1;
+    min-width: 120px;
+  }
+  
+  .benefits-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .help-footer {
+    flex-direction: column;
+    gap: 1rem;
+    text-align: center;
+  }
+}
+
+/* AI Info Card Styles (replacing Ollama info card) */
+.ai-info-card {
+  background: linear-gradient(135deg, #f0f7ff 0%, #e6f1ff 100%);
+  border-radius: 10px;
+  padding: 1.5rem;
+  margin: 1.5rem 0;
+  border-left: 4px solid var(--primary-color);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.ai-info-content h3 {
+  color: var(--primary-color);
+  margin-top: 0;
+  margin-bottom: 0.5rem;
+  font-size: 1.2rem;
+}
+
+.ai-info-content p {
+  margin-bottom: 1rem;
+  color: var(--dark-text);
+}
+
+.learn-more-link {
+  display: inline-block;
+  color: var(--primary-color);
+  text-decoration: none;
+  font-weight: 600;
+  padding: 0.5rem 1rem;
+  background-color: rgba(74, 120, 227, 0.1);
+  border-radius: 20px;
+  transition: background-color 0.2s, transform 0.2s;
+}
+
+.learn-more-link:hover {
+  background-color: rgba(74, 120, 227, 0.2);
+  transform: translateY(-2px);
+}
+
+/* Add these new styles for the updated Help page */
+
+/* Logging method sections */
+.logging-method {
+  margin-bottom: 2rem;
+  padding: 1.5rem;
+    background-color: #f9f9f9;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.logging-method h4 {
+  margin-top: 0;
+  margin-bottom: 1rem;
+  color: #333;
+  font-size: 1.2rem;
+  font-weight: 600;
+}
+
+.logging-method pre {
+  background-color: #f0f0f0;
+  padding: 0.75rem;
+  border-radius: 4px;
+  overflow-x: auto;
+  margin: 1rem 0;
+}
+
+.logging-method ul {
+  padding-left: 1.5rem;
+}
+
+.logging-method li {
+  margin-bottom: 0.5rem;
+}
+
+/* Logging examples layout */
+.logging-examples {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.5rem;
+}
+
+@media (min-width: 768px) {
+  .logging-examples {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.natural-language, .structured-format {
+  background-color: #f9f9f9;
+  padding: 1.5rem;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.natural-language h4, .structured-format h4 {
+  margin-top: 0;
+  margin-bottom: 1rem;
+  color: #333;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+/* Code formatting */
+.help-page code {
+  background-color: #f0f0f0;
+  padding: 0.2rem 0.4rem;
+  border-radius: 4px;
+  font-family: 'Courier New', monospace;
+  font-size: 0.9rem;
+}
+
+/* Note styling */
+.note {
+  font-size: 0.9rem;
+  color: #666;
+  font-style: italic;
+  margin-top: 1rem;
+  padding-left: 1rem;
+  border-left: 3px solid #ddd;
+}
+
+/* Development badge */
+.development-badge {
+  position: absolute;
+  top: -10px;
+  left: 50%;
+  transform: translateX(-50%);
+  background-color: #f8d7da;
+  color: #721c24;
+  padding: 3px 10px;
+  border-radius: 4px;
+  font-size: 12px;
+  z-index: 10;
+  border: 1px solid #f5c6cb;
+}
+
+/* Structured input badge */
+.structured-input-badge {
+  position: absolute;
+  top: -10px;
+  left: 50%;
+  transform: translateX(-50%);
+  background-color: #d4edda;
+  color: #155724;
+  padding: 3px 10px;
+  border-radius: 4px;
+  font-size: 12px;
+  z-index: 10;
+  border: 1px solid #c3e6cb;
+}
+
+/* Model Selector Styles */
+.model-selector {
+  background-color: #f5f5f5;
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 16px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  position: relative;
+}
+
+.model-selector-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.model-selector label {
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: #555;
+}
+
+.model-select {
+  padding: 4px 8px;
+  border-radius: 4px;
+  border: 1px solid #ccc;
+  background-color: white;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.info-button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 1rem;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.model-info-panel {
+  margin-top: 12px;
+  padding: 12px;
+  background-color: white;
+  border-radius: 6px;
+  border: 1px solid #ddd;
+  font-size: 0.85rem;
+}
+
+.model-info-panel h4 {
+  margin-top: 0;
+  margin-bottom: 8px;
+  color: #333;
+}
+
+.model-info-panel ul {
+  padding-left: 20px;
+  margin: 8px 0;
+}
+
+.model-info-panel li {
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+
+.download-button {
+  background-color: #4285f4;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  margin-left: 8px;
+}
+
+.download-button:disabled {
+  background-color: #a0a0a0;
+  cursor: not-allowed;
+}
+
+.model-info-note {
+  font-size: 0.8rem;
+  color: #666;
+  margin-top: 12px;
+  padding-top: 8px;
+  border-top: 1px dashed #ddd;
+}
+
+/* Development Mode Badge */
+.development-badge {
+  background-color: #ffd700;
+  color: #333;
+  font-size: 0.8rem;
+  padding: 4px 8px;
+  border-radius: 4px;
+  text-align: center;
+  margin-bottom: 10px;
+  font-weight: bold;
+}

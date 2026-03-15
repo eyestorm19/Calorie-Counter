@@ -9,6 +9,7 @@ import Login from './pages/Login';
 import Register from './pages/Register';
 import Track from './pages/Track';
 import Profile from './pages/Profile';
+import Help from './pages/Help';
 
 function App() {
   const appMode = import.meta.env.VITE_APP_MODE || 'production';
@@ -39,6 +40,10 @@ function App() {
                     <Profile />
                   </PrivateRoute>
                 }
+              />
+              <Route
+                path="/help"
+                element={<Help />}
               />
             </Routes>
           </div>

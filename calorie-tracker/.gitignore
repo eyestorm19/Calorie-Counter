@@ -22,6 +22,7 @@ dist-ssr
 .env.production
 .env.development.local
 .env.production.local
+.env*.bak
 
 # Firebase
 firebase-debug.log

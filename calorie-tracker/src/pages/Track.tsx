@@ -372,13 +372,16 @@ export default function Track() {
 
       <div className="chat-section">
         <ChatInput 
-          onActivityAdd={handleActivityAdd} 
+          onActivityAdd={handleActivityAdd}
+          onActivityDelete={handleDelete}
+          onActivityEdit={handleEdit}
           currentStats={{
             netCalories: todayData.netCalories,
             consumedCalories: todayData.totalConsumed,
             burnedCalories: todayData.totalBurned,
-            targetCalories: targetCalories
+            targetCalories
           }}
+          activities={todayData.activities}
         />
       </div>
 

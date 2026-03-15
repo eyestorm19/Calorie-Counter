@@ -8,8 +8,6 @@ export default function Navbar() {
 
   const isActive = (path: string) => location.pathname === path;
 
-  if (!user) return null;
-
   return (
     <nav className="navbar">
       <div className="navbar-brand">
@@ -17,21 +15,46 @@ export default function Navbar() {
       </div>
       <div className="navbar-menu">
         <div className="navbar-end">
+          {user ? (
+            <>
+              <Link 
+                to="/track" 
+                className={`navbar-item ${isActive('/track') ? 'active' : ''}`}
+              >
+                Track
+              </Link>
+              <Link 
+                to="/profile" 
+                className={`navbar-item ${isActive('/profile') ? 'active' : ''}`}
+              >
+                Profile
+              </Link>
+              <button onClick={logout} className="navbar-item logout-button">
+                Logout
+              </button>
+            </>
+          ) : (
+            <>
+              <Link 
+                to="/login" 
+                className={`navbar-item ${isActive('/login') ? 'active' : ''}`}
+              >
+                Login
+              </Link>
+              <Link 
+                to="/register" 
+                className={`navbar-item ${isActive('/register') ? 'active' : ''}`}
+              >
+                Register
+              </Link>
+            </>
+          )}
           <Link 
-            to="/track" 
-            className={`navbar-item ${isActive('/track') ? 'active' : ''}`}
+            to="/help" 
+            className={`navbar-item ${isActive('/help') ? 'active' : ''}`}
           >
-            Track
+            Help
           </Link>
-          <Link 
-            to="/profile" 
-            className={`navbar-item ${isActive('/profile') ? 'active' : ''}`}
-          >
-            Profile
-          </Link>
-          <button onClick={logout} className="navbar-item logout-button">
-            Logout
-          </button>
         </div>
       </div>
     </nav>
