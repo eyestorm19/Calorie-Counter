@@ -2,16 +2,9 @@ import { useState, useRef, useEffect } from 'react';
 import type { Activity } from '../types';
 import { useAuth } from '../contexts/AuthContext';
 
-// Configuration for different environments
-const isDevelopment = import.meta.env.MODE === 'development' || import.meta.env.DEV;
-
-// In development, use local Ollama; in production, use the cloud Ollama server
-const API_ENDPOINT = isDevelopment 
-  ? 'http://localhost:11434/api/generate'  // Local Ollama in development
-  : import.meta.env.VITE_AI_API_ENDPOINT; // Cloud Ollama server in production
-
-// Check if AI service is available in this environment
-const AI_SERVICE_AVAILABLE = isDevelopment || (import.meta.env.VITE_AI_SERVICE_ENABLED === 'true');
+// Single backend for both dev and prod: Cloud Function (Gemini). Set VITE_AI_API_ENDPOINT in .env.
+const API_ENDPOINT = import.meta.env.VITE_AI_API_ENDPOINT || '';
+const AI_SERVICE_AVAILABLE = Boolean(API_ENDPOINT);
 
 // Function to check if input is in the structured format
 const isStructuredInputFormat = (text: string): boolean => {
@@ -128,6 +121,16 @@ export default function ChatInput({ onActivityAdd, onActivityDelete, onActivityE
     timestamp: new Date()
   }]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [expandedDetails, setExpandedDetails] = useState<Set<string>>(new Set());
+
+  const toggleDetails = (messageId: string) => {
+    setExpandedDetails(prev => {
+      const next = new Set(prev);
+      if (next.has(messageId)) next.delete(messageId);
+      else next.add(messageId);
+      return next;
+    });
+  };
 
   const scrollToBottom = () => {
     if (messagesEndRef.current) {
@@ -175,120 +178,50 @@ export default function ChatInput({ onActivityAdd, onActivityDelete, onActivityE
       } else {
         // Try AI processing if available
         try {
-          // Prepare headers
-          const headers: Record<string, string> = {
-            'Content-Type': 'application/json',
-          };
-          
-          // The prompt is the same in development and production
-          const promptText = `Analyze this input and convert it into a JSON object with the following structure:
-
-{
-  "type": "activity_update" | "question" | "edit_request" | "out_of_scope",
-  "activity": null | {
-    "name": "activity or item name",
-    "calories": number,
-    "type": "burn" | "consume"
-  },
-  "question_type": null | "calorie_lookup" | "stats_query" | "hypothetical_scenario",
-  "edit_type": null | "modify_last" | "delete_last",
-  "user_question": "${message}",
-  "answer": "short, friendly explanation"
-}
-
-Rules:
-1. For food items, activity.type = "consume"
-2. For exercises, activity.type = "burn"
-3. If calories aren't specified, estimate typical values
-4. activity.name should be short and descriptive (e.g., "banana", "yoga", "5K run"). Remove action words like "ate", "ran", "had", etc.
-5. Set type = "activity_update" only if the user is logging something they just did
-6. If the user is asking a question (about food, exercise, stats, or hypotheticals), set type = "question" and fill question_type
-7. Use question_type = "calorie_lookup" for food-related questions (e.g., "how many calories in..."), "stats_query" for current progress questions, and "hypothetical_scenario" for future/what-if questions
-8. If the user wants to change or delete their last activity, set type = "edit_request" and use edit_type ("modify_last" or "delete_last"). You may include a corrected activity if needed.
-9. If the message is unrelated to food, exercise, or calorie tracking, return type = "out_of_scope"
-10. Always return all fields in the JSON. Use null if a field is not relevant.
-11. Return only the JSON object — no other text.
-
-Examples:
-Input: "I ate a banana"
-Output:
-{
-  "type": "activity_update",
-  "activity": { "name": "banana", "calories": 105, "type": "consume" },
-  "question_type": null,
-  "edit_type": null,
-  "user_question": "I ate a banana",
-  "answer": "Logged 105 calories for a banana."
-}
-
-Input: "What if I eat a pizza later?"
-Output:
-{
-  "type": "question",
-  "activity": null,
-  "question_type": "hypothetical_scenario",
-  "edit_type": null,
-  "user_question": "What if I eat a pizza later?",
-  "answer": "A slice of pizza adds around 285–350 calories depending on size and toppings."
-}
-
-Input: "Change that last workout to 300 calories"
-Output:
-{
-  "type": "edit_request",
-  "activity": { "name": "previous workout", "calories": 300, "type": "burn" },
-  "question_type": null,
-  "edit_type": "modify_last",
-  "user_question": "Change that last workout to 300 calories",
-  "answer": "Updated your last workout to 300 calories burned."
-}
-
-Input: "What's the capital of France?"
-Output:
-{
-  "type": "out_of_scope",
-  "activity": null,
-  "question_type": null,
-  "edit_type": null,
-  "user_question": "What's the capital of France?",
-  "answer": "Sorry, I can only help with calorie tracking, food intake, and workouts."
-}
-
-Input: "${message}"`;
-
-          // Use the selected model from context
-          const requestBody = {
-            prompt: promptText,
-            stream: false,
-          };
-
+          // Backend builds the full prompt; send only the user message.
           const response = await fetch(API_ENDPOINT, {
             method: 'POST',
-            headers: {
-              'Content-Type': 'application/json'
-            },
+            headers: { 'Content-Type': 'application/json' },
             credentials: 'include',
-            body: JSON.stringify(requestBody),
+            body: JSON.stringify({ prompt: message, stream: false }),
           });
 
           const data = await response.json();
-          try {
-            // Parse the AI response
-            let activityData;
-            // The response format is the same for all models
-            activityData = JSON.parse(data.response);
-            
-            await handleActivityData(activityData);
-          } catch (parseErr) {
-            // If parsing fails, inform the user they can use structured format
-            console.warn('Failed to parse AI response', parseErr);
-            const errorMessage: Message = {
+
+          if (!response.ok || data.error) {
+            const text = data.fallbackMessage || data.error || 'Our AI service is temporarily unavailable. Please use the structured format: item: [name], calories: [number], type: [consume/burn]';
+            setMessages(prev => [...prev, {
+              id: Date.now().toString(),
+              text,
+              type: 'assistant',
+              timestamp: new Date()
+            }]);
+            setMessage('');
+            return;
+          }
+
+          if (!data.response) {
+            setMessages(prev => [...prev, {
               id: Date.now().toString(),
               text: "Sorry, I couldn't understand that. You can try rephrasing, or use the structured format: \"item: [name], calories: [number], type: [consume/burn]\"",
               type: 'assistant',
               timestamp: new Date()
-            };
-            setMessages(prev => [...prev, errorMessage]);
+            }]);
+            setMessage('');
+            return;
+          }
+
+          try {
+            const activityData = JSON.parse(data.response);
+            await handleActivityData(activityData);
+          } catch (parseErr) {
+            console.warn('Failed to parse AI response', parseErr);
+            setMessages(prev => [...prev, {
+              id: Date.now().toString(),
+              text: "Sorry, I couldn't understand that. You can try rephrasing, or use the structured format: \"item: [name], calories: [number], type: [consume/burn]\"",
+              type: 'assistant',
+              timestamp: new Date()
+            }]);
             setMessage('');
           }
         } catch (fetchErr) {
@@ -331,116 +264,93 @@ Input: "${message}"`;
       };
       setMessages(prev => [...prev, errorMessage]);
     } else {
-      // Format the JSON response for display
-      const jsonResponse = JSON.stringify(activityData, null, 2).replace(/"/g, '\\"');
-      
-      // Handle different types of responses
+      // Bubble shows only short text; full response is in expandable "Thinking" section via activityData
       switch (activityData.type) {
         case 'activity_update':
           if (activityData.activity) {
-            // Add activity to the log
             onActivityAdd(activityData.activity);
-            
-            const responseText = `Got it! Logged ${activityData.activity.type === 'consume' ? '' : 'a '}${activityData.activity.name} (${activityData.activity.calories} cal)\n\nResponse:\n\`\`\`json\n${jsonResponse}\n\`\`\``;
-            const assistantMessage: Message = {
+            const shortText = activityData.answer ?? `Got it! Logged ${activityData.activity.type === 'consume' ? '' : 'a '}${activityData.activity.name} (${activityData.activity.calories} cal).`;
+            setMessages(prev => [...prev, {
               id: Date.now().toString(),
-              text: responseText,
+              text: shortText,
               type: 'assistant',
               timestamp: new Date(),
               activityData
-            };
-            setMessages(prev => [...prev, assistantMessage]);
+            }]);
           }
           break;
 
         case 'edit_request':
           if (activityData.edit_type === 'delete_last') {
-            // Get the last activity from the database
-            const lastActivity = activities[0]; // Activities are sorted by timestamp in descending order
-            
+            const lastActivity = activities[0];
             if (lastActivity?.id) {
               try {
-                // Delete the last activity and wait for completion
                 await onActivityDelete(lastActivity.id);
-                const responseText = `Removed your last activity from the log.\n\nResponse:\n\`\`\`json\n${jsonResponse}\n\`\`\``;
-                const assistantMessage: Message = {
+                setMessages(prev => [...prev, {
                   id: Date.now().toString(),
-                  text: responseText,
+                  text: activityData.answer ?? 'Removed your last activity from the log.',
                   type: 'assistant',
                   timestamp: new Date(),
                   activityData
-                };
-                setMessages(prev => [...prev, assistantMessage]);
+                }]);
               } catch (err) {
                 console.error('Failed to delete activity:', err);
-                const errorMessage: Message = {
+                setMessages(prev => [...prev, {
                   id: Date.now().toString(),
                   text: "Sorry, I couldn't delete the activity. Please try again.",
                   type: 'assistant',
                   timestamp: new Date()
-                };
-                setMessages(prev => [...prev, errorMessage]);
+                }]);
               }
             }
           } else if (activityData.edit_type === 'modify_last' && activityData.activity) {
-            // Get the last activity from the database
-            const lastActivity = activities[0]; // Activities are sorted by timestamp in descending order
-            
+            const lastActivity = activities[0];
             if (lastActivity?.id) {
-              // Update the last activity
               const updatedActivity = {
                 ...activityData.activity,
                 id: lastActivity.id,
                 timestamp: lastActivity.timestamp
               };
               onActivityEdit(updatedActivity);
-              const responseText = `Updated your last activity to ${activityData.activity.name} (${activityData.activity.calories} cal)\n\nResponse:\n\`\`\`json\n${jsonResponse}\n\`\`\``;
-              const assistantMessage: Message = {
+              setMessages(prev => [...prev, {
                 id: Date.now().toString(),
-                text: responseText,
+                text: activityData.answer ?? `Updated your last activity to ${activityData.activity.name} (${activityData.activity.calories} cal).`,
                 type: 'assistant',
                 timestamp: new Date(),
                 activityData
-              };
-              setMessages(prev => [...prev, assistantMessage]);
+              }]);
             }
           }
           break;
 
         case 'question':
-          // Display the answer for questions
-          const assistantMessage: Message = {
+          setMessages(prev => [...prev, {
             id: Date.now().toString(),
-            text: `${activityData.answer}\n\nResponse:\n\`\`\`json\n${jsonResponse}\n\`\`\``,
+            text: activityData.answer ?? "Here's what I found.",
             type: 'assistant',
             timestamp: new Date(),
             activityData
-          };
-          setMessages(prev => [...prev, assistantMessage]);
+          }]);
           break;
 
         case 'out_of_scope':
-          // Display the polite fallback message
-          const outOfScopeMessage: Message = {
+          setMessages(prev => [...prev, {
             id: Date.now().toString(),
-            text: `${activityData.answer}\n\nResponse:\n\`\`\`json\n${jsonResponse}\n\`\`\``,
+            text: activityData.answer ?? "I can only help with calorie tracking.",
             type: 'assistant',
             timestamp: new Date(),
             activityData
-          };
-          setMessages(prev => [...prev, outOfScopeMessage]);
+          }]);
           break;
 
         default:
-          // Handle unknown response types
-          const unknownMessage: Message = {
+          setMessages(prev => [...prev, {
             id: Date.now().toString(),
-            text: `I'm not sure how to handle that. Could you try rephrasing or use the structured format?\n\nResponse:\n\`\`\`json\n${jsonResponse}\n\`\`\``,
+            text: activityData.answer ?? "I'm not sure how to handle that. Try rephrasing or use the structured format.",
             type: 'assistant',
             timestamp: new Date(),
             activityData
-          };
-          setMessages(prev => [...prev, unknownMessage]);
+          }]);
       }
     }
     setMessage('');
@@ -456,6 +366,23 @@ Input: "${message}"`;
           >
             <div className="message-content">
               <p>{msg.text}</p>
+              {msg.type === 'assistant' && msg.activityData && (
+                <>
+                  <button
+                    type="button"
+                    className="thinking-toggle"
+                    onClick={() => toggleDetails(msg.id)}
+                    aria-expanded={expandedDetails.has(msg.id)}
+                  >
+                    {expandedDetails.has(msg.id) ? 'Hide full response' : 'Thinking'}
+                  </button>
+                  {expandedDetails.has(msg.id) && (
+                    <pre className="thinking-details">
+                      {JSON.stringify(msg.activityData, null, 2)}
+                    </pre>
+                  )}
+                </>
+              )}
               <span className="message-time">
                 {msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
               </span>
@@ -465,7 +392,7 @@ Input: "${message}"`;
         <div ref={messagesEndRef} />
       </div>
 
-      {!AI_SERVICE_AVAILABLE && !isDevelopment && (
+      {!AI_SERVICE_AVAILABLE && (
         <div className="structured-input-badge">
           <span>Structured Input Mode</span>
         </div>
