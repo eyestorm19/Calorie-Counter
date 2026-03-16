@@ -27,6 +27,8 @@ export default function Track() {
   const [editActivity, setEditActivity] = useState<Activity | null>(null);
   const [editName, setEditName] = useState('');
   const [editCalories, setEditCalories] = useState('');
+  const [consumedExpanded, setConsumedExpanded] = useState(false);
+  const [burnedExpanded, setBurnedExpanded] = useState(false);
 
   // Add effect to log state changes
   useEffect(() => {
@@ -356,14 +358,118 @@ export default function Track() {
             </span>
           </div>
           <div className="summary-details">
-            <span className="calorie-detail consumed">
-              <span className="detail-label">Consumed:</span> 
+            <div
+              className="summary-detail-row consumed"
+              onClick={() => setConsumedExpanded(prev => !prev)}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setConsumedExpanded(prev => !prev); } }}
+              aria-expanded={consumedExpanded}
+            >
+              <span className="detail-label">Consumed:</span>
               <span className="detail-value">+{todayData.totalConsumed} kcal</span>
-            </span>
-            <span className="calorie-detail burned">
-              <span className="detail-label">Burned:</span> 
+              <span className={`detail-chevron ${consumedExpanded ? 'expanded' : ''}`} aria-hidden>▼</span>
+            </div>
+            {consumedExpanded && (
+              <ul className="collapsible-activity-list">
+                {[...todayData.activities]
+                  .filter(a => a.type === 'consume')
+                  .sort((a, b) => b.timestamp.seconds - a.timestamp.seconds)
+                  .map((activity) => (
+                    <li key={activity.id} className="activity-item" onClick={(e) => e.stopPropagation()}>
+                      <div className="activity-info">
+                        <div className="activity-details">
+                          {editActivity?.id === activity.id ? (
+                            <input type="text" value={editName} onChange={(e) => setEditName(e.target.value)} className="edit-input" placeholder="Activity name" required autoFocus />
+                          ) : (
+                            <span className="activity-name">{activity.name || 'Unnamed Activity'}</span>
+                          )}
+                          <span className="activity-time">
+                            {new Date(activity.timestamp.seconds * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                        </div>
+                        {editActivity?.id === activity.id ? (
+                          <input type="number" value={editCalories} onChange={(e) => { const v = e.target.value; if (v === '' || /^-?\d*$/.test(v)) setEditCalories(v); }} className="edit-input" placeholder="Calories" required />
+                        ) : (
+                          <span className="calorie-value consumed">+{activity.calories || 0} cal</span>
+                        )}
+                      </div>
+                      <div className="activity-actions">
+                        {editActivity?.id === activity.id ? (
+                          <>
+                            <button type="button" className="submit-button" onClick={handleEditSubmit} title="Save"><i className="material-icons">check</i></button>
+                            <button type="button" className="cancel-button" onClick={() => setEditActivity(null)} title="Cancel"><i className="material-icons">close</i></button>
+                          </>
+                        ) : (
+                          <>
+                            <button type="button" className="edit-button" onClick={() => handleEdit(activity)} title="Edit"><i className="material-icons">edit</i></button>
+                            <button type="button" className="delete-button" onClick={() => handleDelete(activity.id)} title="Delete"><i className="material-icons">delete</i></button>
+                          </>
+                        )}
+                      </div>
+                    </li>
+                  ))}
+              </ul>
+            )}
+            {consumedExpanded && todayData.activities.filter(a => a.type === 'consume').length === 0 && (
+              <p className="collapsible-empty">No items consumed today</p>
+            )}
+            <div
+              className="summary-detail-row burned"
+              onClick={() => setBurnedExpanded(prev => !prev)}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setBurnedExpanded(prev => !prev); } }}
+              aria-expanded={burnedExpanded}
+            >
+              <span className="detail-label">Burned:</span>
               <span className="detail-value">-{todayData.totalBurned} kcal</span>
-            </span>
+              <span className={`detail-chevron ${burnedExpanded ? 'expanded' : ''}`} aria-hidden>▼</span>
+            </div>
+            {burnedExpanded && (
+              <ul className="collapsible-activity-list">
+                {[...todayData.activities]
+                  .filter(a => a.type === 'burn')
+                  .sort((a, b) => b.timestamp.seconds - a.timestamp.seconds)
+                  .map((activity) => (
+                    <li key={activity.id} className="activity-item" onClick={(e) => e.stopPropagation()}>
+                      <div className="activity-info">
+                        <div className="activity-details">
+                          {editActivity?.id === activity.id ? (
+                            <input type="text" value={editName} onChange={(e) => setEditName(e.target.value)} className="edit-input" placeholder="Activity name" required autoFocus />
+                          ) : (
+                            <span className="activity-name">{activity.name || 'Unnamed Activity'}</span>
+                          )}
+                          <span className="activity-time">
+                            {new Date(activity.timestamp.seconds * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                        </div>
+                        {editActivity?.id === activity.id ? (
+                          <input type="number" value={editCalories} onChange={(e) => { const v = e.target.value; if (v === '' || /^-?\d*$/.test(v)) setEditCalories(v); }} className="edit-input" placeholder="Calories" required />
+                        ) : (
+                          <span className="calorie-value burned">-{activity.calories || 0} cal</span>
+                        )}
+                      </div>
+                      <div className="activity-actions">
+                        {editActivity?.id === activity.id ? (
+                          <>
+                            <button type="button" className="submit-button" onClick={handleEditSubmit} title="Save"><i className="material-icons">check</i></button>
+                            <button type="button" className="cancel-button" onClick={() => setEditActivity(null)} title="Cancel"><i className="material-icons">close</i></button>
+                          </>
+                        ) : (
+                          <>
+                            <button type="button" className="edit-button" onClick={() => handleEdit(activity)} title="Edit"><i className="material-icons">edit</i></button>
+                            <button type="button" className="delete-button" onClick={() => handleDelete(activity.id)} title="Delete"><i className="material-icons">delete</i></button>
+                          </>
+                        )}
+                      </div>
+                    </li>
+                  ))}
+              </ul>
+            )}
+            {burnedExpanded && todayData.activities.filter(a => a.type === 'burn').length === 0 && (
+              <p className="collapsible-empty">No items burned today</p>
+            )}
           </div>
         </div>
       </div>
@@ -385,91 +491,6 @@ export default function Track() {
         />
       </div>
 
-      <div className="activities-list">
-        <h3>Today's Activities</h3>
-        {todayData.activities.length === 0 ? (
-          <p>No activities recorded for today</p>
-        ) : (
-          <ul>
-            {[...todayData.activities]
-              .sort((a, b) => b.timestamp.seconds - a.timestamp.seconds)
-              .map((activity) => {
-                console.log('📝 Rendering activity:', {
-                  id: activity.id,
-                  name: activity.name,
-                  calories: activity.calories,
-                  type: activity.type,
-                  timestamp: activity.timestamp
-                });
-                return (
-                <li key={`activity-${activity.id}`} className="activity-item">
-                  <div className="activity-info">
-                    <div className="activity-details">
-                      {editActivity?.id === activity.id ? (
-                        <input
-                          type="text"
-                          value={editName}
-                          onChange={(e) => setEditName(e.target.value)}
-                          className="edit-input"
-                          placeholder="Activity name"
-                          required
-                          autoFocus
-                        />
-                      ) : (
-                        <span className="activity-name">{activity.name || 'Unnamed Activity'}</span>
-                      )}
-                      <span className="activity-time">
-                        {new Date(activity.timestamp.seconds * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                      </span>
-                    </div>
-                    {editActivity?.id === activity.id ? (
-                      <input
-                        type="number"
-                        value={editCalories}
-                        onChange={(e) => {
-                          const value = e.target.value;
-                          // Allow empty value or numbers with optional negative sign
-                          if (value === '' || /^-?\d*$/.test(value)) {
-                            setEditCalories(value);
-                          }
-                        }}
-                        className="edit-input"
-                        placeholder="Calories (positive for consumed, negative for burned)"
-                        required
-                      />
-                    ) : (
-                      <span className={`calorie-value ${activity.type === 'burn' ? 'burned' : 'consumed'}`}>
-                        {activity.type === 'burn' ? '-' : '+'}{activity.calories || 0} cal
-                      </span>
-                    )}
-                  </div>
-                  <div className="activity-actions">
-                    {editActivity?.id === activity.id ? (
-                      <>
-                        <button type="submit" className="submit-button" onClick={handleEditSubmit} title="Save">
-                          <i className="material-icons">check</i>
-                        </button>
-                        <button type="button" className="cancel-button" onClick={() => setEditActivity(null)} title="Cancel">
-                          <i className="material-icons">close</i>
-                        </button>
-                      </>
-                    ) : (
-                      <>
-                        <button className="edit-button" onClick={() => handleEdit(activity)} title="Edit activity">
-                          <i className="material-icons">edit</i>
-                        </button>
-                        <button className="delete-button" onClick={() => handleDelete(activity.id)} title="Delete activity">
-                          <i className="material-icons">delete</i>
-                        </button>
-                      </>
-                    )}
-                  </div>
-                </li>
-              )}
-            )}
-          </ul>
-        )}
-      </div>
     </div>
   );
 } 

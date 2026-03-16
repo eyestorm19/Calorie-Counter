@@ -2353,8 +2353,62 @@ form p a:hover {
 
 .summary-details {
   display: flex;
-  justify-content: center;
-  gap: 1.5rem;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.25rem;
+}
+
+.summary-detail-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  cursor: pointer;
+  border-radius: 8px;
+  transition: background-color 0.15s ease;
+  user-select: none;
+}
+
+.summary-detail-row:hover {
+  background-color: var(--background-color);
+}
+
+.summary-detail-row.consumed .detail-value {
+  color: #f44336;
+}
+
+.summary-detail-row.burned .detail-value {
+  color: #4CAF50;
+}
+
+.detail-chevron {
+  margin-left: auto;
+  font-size: 0.7rem;
+  opacity: 0.8;
+  transition: transform 0.2s ease;
+}
+
+.summary-detail-row .detail-chevron.expanded {
+  transform: rotate(180deg);
+}
+
+.collapsible-activity-list {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 0 0.5rem;
+  border-left: 2px solid var(--border-color);
+  padding-left: 0.75rem;
+}
+
+.collapsible-activity-list .activity-item {
+  margin-bottom: 0;
+}
+
+.collapsible-empty {
+  margin: 0.5rem 0 0.5rem 0.75rem;
+  padding: 0.5rem 0;
+  font-size: 0.9rem;
+  color: var(--text-light);
 }
 
 .calorie-detail {
@@ -2400,10 +2454,12 @@ form p a:hover {
   }
   
   .summary-details {
-    flex-direction: column;
-    gap: 0.5rem;
-    align-items: center;
+    gap: 0.35rem;
     width: 100%;
+  }
+  
+  .summary-detail-row {
+    padding: 0.5rem 0.5rem;
   }
   
   .calorie-detail {
