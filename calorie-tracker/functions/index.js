@@ -19,10 +19,12 @@ function buildCaloriePrompt(userInput) {
     "calories": number,
     "type": "burn" | "consume"
   },
-  "question_type": null | "calorie_lookup" | "stats_query" | "hypothetical_scenario",
+  "question_type": null | "stats_query" | "log_count" | "log_list" | "goal_check" | "calorie_lookup" | "hypothetical_scenario",
   "edit_type": null | "modify_last" | "delete_last",
+  "item_name": null | "string (single item name for log_count/log_list, e.g. banana, run)",
+  "period": null | "today" | "week",
   "user_question": "${userInput.replace(/"/g, '\\"')}",
-  "answer": "short, friendly explanation"
+  "answer": "short, friendly explanation (use null for stats_query, log_count, log_list, goal_check; the app will compute the answer)"
 }
 
 Rules:
@@ -31,57 +33,54 @@ Rules:
 3. If calories aren't specified, estimate typical values
 4. activity.name should be short and descriptive (e.g., "banana", "yoga", "5K run"). Remove action words like "ate", "ran", "had", etc.
 5. Set type = "activity_update" only if the user is logging something they just did
-6. If the user is asking a question (about food, exercise, stats, or hypotheticals), set type = "question" and fill question_type
-7. Use question_type = "calorie_lookup" for food-related questions (e.g., "how many calories in..."), "stats_query" for current progress questions, and "hypothetical_scenario" for future/what-if questions
-8. If the user wants to change or delete their last activity, set type = "edit_request" and use edit_type ("modify_last" or "delete_last"). You may include a corrected activity if needed.
-9. If the message is unrelated to food, exercise, or calorie tracking, return type = "out_of_scope"
-10. Always return all fields in the JSON. Use null if a field is not relevant.
-11. Return only the JSON object — no other text.
+6. If the user is asking a question, set type = "question" and set question_type and slots (item_name, period) as follows:
+   - stats_query: user asks about totals (calories consumed/burned, net). Set period to "today" or "week" from context; item_name null. Set answer to null.
+   - log_count: user asks "how many X did I eat/log?". Set item_name to the item (e.g. "banana", "run"); set period to "today" or "week" if implied, else "today". Set answer to null.
+   - log_list: user asks what they ate/logged (list). Set period to "today" or "week"; item_name null unless they ask about a specific item. Set answer to null.
+   - goal_check: user asks whether they are over/under/at their calorie goal (e.g. "Will I be above my calorie goal?", "Am I over my goal?"). Set period to "today" or "week" if implied, else "today"; item_name null. Set answer to null.
+   - calorie_lookup: general calorie info (e.g. "how many calories in an avocado?"). item_name and period null. Fill answer with the info.
+   - hypothetical_scenario: what-if or future (e.g. "what if I eat pizza later?"). item_name and period null. Fill answer.
+7. If the user wants to change or delete their last activity, set type = "edit_request" and use edit_type ("modify_last" or "delete_last"). You may include a corrected activity if needed.
+8. If the message is unrelated to food, exercise, or calorie tracking, return type = "out_of_scope"
+9. Always return all fields. Use null when not relevant.
+10. Return only the JSON object — no other text.
 
 Examples:
 Input: "I ate a banana"
 Output:
-{
-  "type": "activity_update",
-  "activity": { "name": "banana", "calories": 105, "type": "consume" },
-  "question_type": null,
-  "edit_type": null,
-  "user_question": "I ate a banana",
-  "answer": "Logged 105 calories for a banana."
-}
+{"type": "activity_update", "activity": {"name": "banana", "calories": 105, "type": "consume"}, "question_type": null, "edit_type": null, "item_name": null, "period": null, "user_question": "I ate a banana", "answer": "Logged 105 calories for a banana."}
+
+Input: "How many calories did I consume today?"
+Output:
+{"type": "question", "activity": null, "question_type": "stats_query", "edit_type": null, "item_name": null, "period": "today", "user_question": "How many calories did I consume today?", "answer": null}
+
+Input: "How many bananas did I eat?"
+Output:
+{"type": "question", "activity": null, "question_type": "log_count", "edit_type": null, "item_name": "banana", "period": "today", "user_question": "How many bananas did I eat?", "answer": null}
+
+Input: "What did I eat today?"
+Output:
+{"type": "question", "activity": null, "question_type": "log_list", "edit_type": null, "item_name": null, "period": "today", "user_question": "What did I eat today?", "answer": null}
+
+Input: "Will I be above my calorie goal?" or "Am I over my goal?"
+Output:
+{"type": "question", "activity": null, "question_type": "goal_check", "edit_type": null, "item_name": null, "period": "today", "user_question": "Will I be above my calorie goal?", "answer": null}
+
+Input: "How many calories in an avocado?"
+Output:
+{"type": "question", "activity": null, "question_type": "calorie_lookup", "edit_type": null, "item_name": null, "period": null, "user_question": "How many calories in an avocado?", "answer": "A medium avocado has about 240 calories."}
 
 Input: "What if I eat a pizza later?"
 Output:
-{
-  "type": "question",
-  "activity": null,
-  "question_type": "hypothetical_scenario",
-  "edit_type": null,
-  "user_question": "What if I eat a pizza later?",
-  "answer": "A slice of pizza adds around 285–350 calories depending on size and toppings."
-}
+{"type": "question", "activity": null, "question_type": "hypothetical_scenario", "edit_type": null, "item_name": null, "period": null, "user_question": "What if I eat a pizza later?", "answer": "A slice of pizza adds around 285–350 calories depending on size and toppings."}
 
 Input: "Change that last workout to 300 calories"
 Output:
-{
-  "type": "edit_request",
-  "activity": { "name": "previous workout", "calories": 300, "type": "burn" },
-  "question_type": null,
-  "edit_type": "modify_last",
-  "user_question": "Change that last workout to 300 calories",
-  "answer": "Updated your last workout to 300 calories burned."
-}
+{"type": "edit_request", "activity": {"name": "previous workout", "calories": 300, "type": "burn"}, "question_type": null, "edit_type": "modify_last", "item_name": null, "period": null, "user_question": "Change that last workout to 300 calories", "answer": "Updated your last workout to 300 calories burned."}
 
 Input: "What's the capital of France?"
 Output:
-{
-  "type": "out_of_scope",
-  "activity": null,
-  "question_type": null,
-  "edit_type": null,
-  "user_question": "What's the capital of France?",
-  "answer": "Sorry, I can only help with calorie tracking, food intake, and workouts."
-}
+{"type": "out_of_scope", "activity": null, "question_type": null, "edit_type": null, "item_name": null, "period": null, "user_question": "What's the capital of France?", "answer": "Sorry, I can only help with calorie tracking, food intake, and workouts."}
 
 Input: "${userInput.replace(/"/g, '\\"')}"`;
 }

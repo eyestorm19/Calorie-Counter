@@ -87,6 +87,98 @@ const parseStructuredInput = (text: string): {
   }
 };
 
+/** Get activity timestamp in ms (supports Firestore Timestamp). */
+function getActivityTimeMs(a: Activity): number {
+  const t = (a as any).timestamp;
+  if (!t) return 0;
+  if (typeof t.seconds === 'number') return t.seconds * 1000;
+  if (typeof t.toDate === 'function') return t.toDate().getTime();
+  return 0;
+}
+
+/** Deterministic answers for log-based questions. Returns NL text only. */
+function answerLogQuestion(
+  questionType: string,
+  slots: { item_name?: string | null; period?: string | null },
+  activities: Activity[],
+  currentStats: { consumedCalories: number; burnedCalories: number; netCalories: number; targetCalories?: number }
+): { text: string } {
+  // goal_check: compare consumed to target (no activity filter needed)
+  if (questionType === 'goal_check') {
+    const consumed = currentStats.consumedCalories;
+    const goal = currentStats.targetCalories ?? 0;
+    if (goal <= 0) {
+      return { text: "You don't have a calorie goal set. Set one in Profile to see how you're doing." };
+    }
+    const diff = consumed - goal;
+    if (diff > 0) return { text: `You've consumed ${consumed} cal. Your goal is ${goal} cal. You're over by ${diff} cal.` };
+    if (diff < 0) return { text: `You've consumed ${consumed} cal. Your goal is ${goal} cal. You're under by ${-diff} cal.` };
+    return { text: `You've consumed ${consumed} cal. You're right at your goal of ${goal} cal!` };
+  }
+
+  const period = slots.period === 'week' ? 'week' : 'today';
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
+  const startOfTodayMs = startOfToday.getTime();
+  const endOfTodayMs = startOfTodayMs + 24 * 60 * 60 * 1000 - 1;
+  const weekAgoMs = startOfTodayMs - 7 * 24 * 60 * 60 * 1000;
+
+  const inPeriod = (ms: number) =>
+    period === 'today'
+      ? ms >= startOfTodayMs && ms <= endOfTodayMs
+      : ms >= weekAgoMs;
+
+  const filtered = activities.filter((a) => inPeriod(getActivityTimeMs(a)));
+
+  if (questionType === 'stats_query') {
+    const consumed = filtered
+      .filter((a) => a.type === 'consume')
+      .reduce((s, a) => s + a.calories, 0);
+    const burned = filtered
+      .filter((a) => a.type === 'burn')
+      .reduce((s, a) => s + a.calories, 0);
+    const net = consumed - burned;
+    const periodLabel = period === 'today' ? 'today' : 'in the last 7 days';
+    return {
+      text: `You consumed ${consumed} cal and burned ${burned} cal ${periodLabel}. Net: ${net} cal.`
+    };
+  }
+
+  if (questionType === 'log_count') {
+    const itemName = (slots.item_name ?? '').trim().toLowerCase();
+    if (!itemName) {
+      return { text: "I'm not sure which item you mean. Try asking e.g. 'How many bananas did I eat?'" };
+    }
+    const matching = filtered.filter((a) =>
+      (a.name ?? '').toLowerCase().includes(itemName)
+    );
+    const count = matching.length;
+    const totalCal = matching.reduce((s, a) => s + a.calories, 0);
+    const periodLabel = period === 'today' ? 'today' : 'in the last 7 days';
+    if (count === 0) {
+      return { text: `You didn't log "${slots.item_name}" ${periodLabel}.` };
+    }
+    const calPart = totalCal > 0 ? ` (${totalCal} cal total)` : '';
+    return {
+      text: `You logged ${slots.item_name} ${count} time(s) ${periodLabel}${calPart}.`
+    };
+  }
+
+  if (questionType === 'log_list') {
+    const periodLabel = period === 'today' ? 'Today' : 'In the last 7 days';
+    if (filtered.length === 0) {
+      return { text: `${periodLabel} you didn't log any activities.` };
+    }
+    const parts = filtered
+      .slice(0, 20)
+      .map((a) => `${a.name} (${a.calories} cal${a.type === 'burn' ? ' burned' : ''})`);
+    const more = filtered.length > 20 ? ` … and ${filtered.length - 20} more` : '';
+    return { text: `${periodLabel} you logged: ${parts.join(', ')}${more}.` };
+  }
+
+  return { text: "I couldn't answer that from your log." };
+}
+
 type Message = {
   id: string;
   text: string;
@@ -323,15 +415,26 @@ export default function ChatInput({ onActivityAdd, onActivityDelete, onActivityE
           }
           break;
 
-        case 'question':
+        case 'question': {
+          const deterministicTypes = ['stats_query', 'log_count', 'log_list', 'goal_check'];
+          const qt = activityData.question_type;
+          const slots = {
+            item_name: activityData.item_name ?? activityData.itemName ?? null,
+            period: activityData.period ?? 'today'
+          };
+          const displayText =
+            qt && deterministicTypes.includes(qt)
+              ? answerLogQuestion(qt, slots, activities, currentStats).text
+              : (activityData.answer ?? "Here's what I found.");
           setMessages(prev => [...prev, {
             id: Date.now().toString(),
-            text: activityData.answer ?? "Here's what I found.",
+            text: displayText,
             type: 'assistant',
             timestamp: new Date(),
             activityData
           }]);
           break;
+        }
 
         case 'out_of_scope':
           setMessages(prev => [...prev, {
