@@ -337,6 +337,10 @@ main {
 }
 
 .activity-item {
+  display: flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 0.5rem;
   padding: 1rem;
   border-bottom: 1px solid var(--border-color);
   transition: all 0.2s ease;
@@ -347,6 +351,8 @@ main {
   justify-content: space-between;
   align-items: center;
   flex: 1;
+  min-width: 0;
+  gap: 0.75rem;
   margin-right: 1rem;
 }
 
@@ -355,12 +361,22 @@ main {
   flex-direction: column;
   gap: 0.25rem;
   flex: 1;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .activity-name {
   font-weight: 500;
   color: var(--text-color);
   transition: all 0.2s ease;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.activity-name:hover {
+  white-space: normal;
+  word-break: break-word;
 }
 
 .activity-time {
@@ -374,6 +390,8 @@ main {
   border-radius: 4px;
   white-space: nowrap;
   font-size: 1.1rem;
+  flex-shrink: 0;
+  min-width: 4.5rem;
 }
 
 .calorie-value.consumed {
@@ -388,7 +406,71 @@ main {
 
 .activity-actions {
   display: flex;
-  gap: 0.5rem;
+  gap: 0.35rem;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+/* Apple-style: smaller, refined action buttons in activity rows */
+.activity-actions .edit-button,
+.activity-actions .delete-button,
+.activity-actions .submit-button,
+.activity-actions .cancel-button {
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  transition: transform 0.15s ease, opacity 0.15s ease;
+}
+
+.activity-actions .edit-button i,
+.activity-actions .delete-button i,
+.activity-actions .submit-button i,
+.activity-actions .cancel-button i {
+  font-size: 1rem;
+}
+
+/* Edit = neutral gray (secondary action) */
+.activity-actions .edit-button {
+  background-color: rgba(142, 142, 147, 0.2);
+  color: #3a3a3c;
+}
+
+.activity-actions .edit-button:hover {
+  background-color: rgba(142, 142, 147, 0.35);
+  opacity: 0.95;
+}
+
+/* Delete = red (destructive only) */
+.activity-actions .delete-button {
+  background-color: rgba(255, 59, 48, 0.15);
+  color: #ff3b30;
+}
+
+.activity-actions .delete-button:hover {
+  background-color: rgba(255, 59, 48, 0.25);
+  opacity: 0.95;
+}
+
+/* Submit (check) = subtle blue */
+.activity-actions .submit-button {
+  background-color: rgba(0, 122, 255, 0.2);
+  color: #007aff;
+}
+
+.activity-actions .submit-button:hover {
+  background-color: rgba(0, 122, 255, 0.35);
+  opacity: 0.95;
+}
+
+/* Cancel = red */
+.activity-actions .cancel-button {
+  background-color: rgba(255, 59, 48, 0.15);
+  color: #ff3b30;
+}
+
+.activity-actions .cancel-button:hover {
+  background-color: rgba(255, 59, 48, 0.25);
+  opacity: 0.95;
 }
 
 .edit-button,
@@ -465,6 +547,15 @@ main {
   .cancel-button {
     width: 40px;
     height: 40px;
+  }
+
+  /* Keep activity row actions compact on mobile (Apple-style) */
+  .activity-actions .edit-button,
+  .activity-actions .delete-button,
+  .activity-actions .submit-button,
+  .activity-actions .cancel-button {
+    width: 32px;
+    height: 32px;
   }
 }
 
@@ -1083,23 +1174,23 @@ main {
   }
 
   .activity-item {
-    flex-direction: column;
-    gap: 0.75rem;
     padding: 1rem 0.75rem;
+    gap: 0.5rem;
   }
 
   .activity-info {
-    width: 100%;
-    margin-right: 0;
-  }
-
-  .activity-actions {
-    width: 100%;
-    justify-content: space-between;
+    margin-right: 0.5rem;
   }
 
   .edit-button, .delete-button {
     flex: 1;
+  }
+
+  .activity-actions .edit-button,
+  .activity-actions .delete-button {
+    flex: 0 0 auto;
+    width: 32px;
+    height: 32px;
   }
 
   .activity-edit {
@@ -1171,12 +1262,13 @@ main {
   }
 
   .activity-actions {
-    flex-direction: column;
-    gap: 0.5rem;
+    gap: 0.35rem;
   }
 
-  .edit-button, .delete-button {
-    width: 100%;
+  .activity-actions .edit-button,
+  .activity-actions .delete-button {
+    width: 32px;
+    height: 32px;
   }
 }
 
@@ -1364,8 +1456,29 @@ main {
 }
 
 /* Chat Interface Styles */
+.assistant-section {
+  margin: 2rem 0 0 0;
+}
+
+.assistant-header {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin-bottom: 1rem;
+}
+
+.assistant-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-color);
+}
+
+.assistant-subtitle {
+  font-size: 0.9rem;
+  color: var(--text-light);
+}
+
 .chat-section {
-  margin: 2rem 0;
   background: var(--card-background);
   border-radius: 8px;
   box-shadow: 0 2px 4px var(--shadow-color);
@@ -1474,6 +1587,30 @@ main {
   color: var(--text-light);
   max-height: 12rem;
   overflow-y: auto;
+}
+
+.chat-examples {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding: 0 1rem 0.75rem 1rem;
+}
+
+.chat-example-chip {
+  padding: 0.35rem 0.75rem;
+  border-radius: 999px;
+  border: 1px solid var(--border-color);
+  background: var(--background-color);
+  color: var(--text-light);
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.chat-example-chip:hover {
+  background: var(--card-background);
+  border-color: var(--primary-color);
+  color: var(--text-color);
 }
 
 .chat-form {
@@ -2383,8 +2520,9 @@ form p a:hover {
 
 .detail-chevron {
   margin-left: auto;
-  font-size: 0.7rem;
-  opacity: 0.8;
+  font-size: 0.65rem;
+  color: var(--text-light);
+  opacity: 0.85;
   transition: transform 0.2s ease;
 }
 

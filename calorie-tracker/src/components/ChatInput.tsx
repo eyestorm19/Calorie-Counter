@@ -212,8 +212,8 @@ export default function ChatInput({ onActivityAdd, onActivityDelete, onActivityE
   const [messages, setMessages] = useState<Message[]>([{
     id: 'welcome',
     text: AI_SERVICE_AVAILABLE 
-      ? "👋 Hi! I'm your calorie tracking assistant. You can tell me what you ate or what exercise you did, and I'll help you log it. Try something like 'I ate a banana' or 'I went for a 30-minute run'.\n\nYou can also use structured format: \"item: [name], calories: [number], type: [consume/burn]\""
-      : "👋 Hi! I'm your calorie tracking assistant. Please log your activities using the structured format: \"item: [name], calories: [number], type: [consume/burn]\"\n\nExamples:\nitem: banana, calories: 105, type: consume\nitem: 30-minute run, calories: 300, type: burn",
+      ? "👋 Tell me what you ate or what exercise you did, and I'll log it for you."
+      : "👋 Log your activities using the structured format: \"item: [name], calories: [number], type: [consume/burn]\".",
     type: 'assistant',
     timestamp: new Date()
   }]);
@@ -241,6 +241,12 @@ export default function ChatInput({ onActivityAdd, onActivityDelete, onActivityE
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  const EXAMPLE_PROMPTS = [
+    'I ate a banana',
+    '30 minute run',
+    'Chicken salad for lunch'
+  ];
 
   const handleImageAttach = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -564,6 +570,21 @@ export default function ChatInput({ onActivityAdd, onActivityDelete, onActivityE
         <div ref={messagesEndRef} />
       </div>
 
+      {messages.length <= 1 && (
+        <div className="chat-examples" aria-label="Example prompts">
+          {EXAMPLE_PROMPTS.map((prompt) => (
+            <button
+              key={prompt}
+              type="button"
+              className="chat-example-chip"
+              onClick={() => setMessage(prompt)}
+            >
+              {prompt}
+            </button>
+          ))}
+        </div>
+      )}
+
       {!AI_SERVICE_AVAILABLE && (
         <div className="structured-input-badge">
           <span>Structured Input Mode</span>
@@ -586,8 +607,8 @@ export default function ChatInput({ onActivityAdd, onActivityDelete, onActivityE
             value={message}
             onChange={(e) => setMessage(e.target.value)}
             placeholder={AI_SERVICE_AVAILABLE 
-              ? "Describe your activity, attach a photo, or use structured format" 
-              : "Use format: item: [name], calories: [number], type: [consume/burn]"}
+              ? "Describe what you ate or did..." 
+              : "item: [name], calories: [number], type: [consume/burn]"}
             className="chat-input"
             disabled={isProcessing}
           />

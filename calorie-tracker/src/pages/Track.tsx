@@ -476,20 +476,29 @@ export default function Track() {
       
       {error && <div className="error">{error}</div>}
 
-      <div className="chat-section">
-        <ChatInput 
-          onActivityAdd={handleActivityAdd}
-          onActivityDelete={handleDelete}
-          onActivityEdit={handleEdit}
-          currentStats={{
-            netCalories: todayData.netCalories,
-            consumedCalories: todayData.totalConsumed,
-            burnedCalories: todayData.totalBurned,
-            targetCalories
-          }}
-          activities={todayData.activities}
-        />
-      </div>
+      <section className="assistant-section" aria-label="Calorie assistant">
+        <header className="assistant-header">
+          <h4 className="assistant-title">Assistant</h4>
+          <p className="assistant-subtitle">
+            Tell me what you ate or what exercise you did, and I&apos;ll log it for you.
+          </p>
+        </header>
+
+        <div className="chat-section">
+          <ChatInput 
+            onActivityAdd={handleActivityAdd}
+            onActivityDelete={handleDelete}
+            onActivityEdit={handleEdit}
+            currentStats={{
+              netCalories: todayData.netCalories,
+              consumedCalories: todayData.totalConsumed,
+              burnedCalories: todayData.totalBurned,
+              targetCalories
+            }}
+            activities={todayData.activities}
+          />
+        </div>
+      </section>
 
     </div>
   );
