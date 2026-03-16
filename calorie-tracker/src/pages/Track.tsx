@@ -476,11 +476,11 @@ export default function Track() {
       
       {error && <div className="error">{error}</div>}
 
-      <section className="assistant-section" aria-label="Calorie assistant">
+      <section className="assistant-section" aria-label="Quick log and questions">
         <header className="assistant-header">
-          <h4 className="assistant-title">Assistant</h4>
+          <h4 className="assistant-title">Quick Log &amp; Ask</h4>
           <p className="assistant-subtitle">
-            Tell me what you ate or what exercise you did, and I&apos;ll log it for you.
+            Log activities or ask about your progress.
           </p>
         </header>
 

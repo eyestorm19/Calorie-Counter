@@ -209,14 +209,7 @@ export default function ChatInput({ onActivityAdd, onActivityDelete, onActivityE
   const [isProcessing, setIsProcessing] = useState(false);
   const [attachedImage, setAttachedImage] = useState<{ data: string; mimeType: string } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [messages, setMessages] = useState<Message[]>([{
-    id: 'welcome',
-    text: AI_SERVICE_AVAILABLE
-      ? "👋 Try something like 'I ate a banana' or '30 minute run'."
-      : "👋 Use: item: [name], calories: [number], type: [consume/burn].",
-    type: 'assistant',
-    timestamp: new Date()
-  }]);
+  const [messages, setMessages] = useState<Message[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [expandedDetails, setExpandedDetails] = useState<Set<string>>(new Set());
 
@@ -245,7 +238,8 @@ export default function ChatInput({ onActivityAdd, onActivityDelete, onActivityE
   const EXAMPLE_PROMPTS = [
     'I ate a banana',
     '30 minute run',
-    'Chicken salad for lunch'
+    'How many calories today?',
+    'What if I ate pizza?'
   ];
 
   const handleImageAttach = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -633,7 +627,7 @@ export default function ChatInput({ onActivityAdd, onActivityDelete, onActivityE
               onChange={(e) => setMessage(e.target.value)}
               placeholder={
                 AI_SERVICE_AVAILABLE
-                  ? 'Describe what you ate or did...'
+                  ? 'Log food, workouts, or ask a question…'
                   : 'item: [name], calories: [number], type: [consume/burn]'
               }
               className="chat-input"

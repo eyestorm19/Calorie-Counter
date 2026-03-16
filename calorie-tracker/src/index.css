@@ -1457,7 +1457,9 @@ main {
 
 /* Chat Interface Styles */
 .assistant-section {
-  margin: 2rem 0 0 0;
+  margin: 2.5rem 0 0 0;
+  padding-top: 1.5rem;
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
 }
 
 .assistant-header {
@@ -3039,20 +3041,24 @@ form p a:hover {
   color: var(--dark-text);
 }
 
-.learn-more-link {
-  display: inline-block;
+.ai-info-card .learn-more-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   color: var(--primary-color);
   text-decoration: none;
-  font-weight: 600;
-  padding: 0.5rem 1rem;
-  background-color: rgba(74, 120, 227, 0.1);
-  border-radius: 20px;
+  font-weight: 500;
+  font-size: 0.85rem;
+  padding: 0.25rem 0.5rem;
+  min-width: 80px;
+  background-color: rgba(74, 120, 227, 0.08);
+  border-radius: 8px;
   transition: background-color 0.2s, transform 0.2s;
 }
 
-.learn-more-link:hover {
-  background-color: rgba(74, 120, 227, 0.2);
-  transform: translateY(-2px);
+.ai-info-card .learn-more-link:hover {
+  background-color: rgba(74, 120, 227, 0.16);
+  transform: translateY(-1px);
 }
 
 /* Add these new styles for the updated Help page */
