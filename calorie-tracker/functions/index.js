@@ -30,7 +30,7 @@ function buildCaloriePrompt(userInput) {
 Rules:
 1. For food items, activity.type = "consume"
 2. For exercises, activity.type = "burn"
-3. If calories aren't specified, estimate typical values
+3. If calories aren't specified, estimate typical values. When estimating: for consumption (food), err on the high side (round up or use the upper end of a range); for burn (exercise), err on the low side (round down or use the lower end).
 4. activity.name should be short and descriptive (e.g., "banana", "yoga", "5K run"). Remove action words like "ate", "ran", "had", etc.
 5. Set type = "activity_update" only if the user is logging something they just did
 6. If the user is asking a question, set type = "question" and set question_type and slots (item_name, period) as follows:
@@ -85,6 +85,39 @@ Output:
 Input: "${userInput.replace(/"/g, '\\"')}"`;
 }
 
+/** Build prompt for image-only or image+text: same JSON schema, instruct model to analyze the image. */
+function buildCaloriePromptForImage(optionalUserText) {
+  const context = optionalUserText.trim()
+    ? ` The user also wrote: \"${optionalUserText.replace(/"/g, '\\"')}\". Consider this when interpreting the image.`
+    : '';
+  return `You are a calorie tracking assistant. The user sent an image.${context}
+
+Analyze the image and output a single JSON object with this structure:
+
+{
+  "type": "activity_update" | "question" | "edit_request" | "out_of_scope",
+  "activity": null | {
+    "name": "activity or item name",
+    "calories": number,
+    "type": "burn" | "consume"
+  },
+  "question_type": null | "stats_query" | "log_count" | "log_list" | "goal_check" | "calorie_lookup" | "hypothetical_scenario",
+  "edit_type": null | "modify_last" | "delete_last",
+  "item_name": null | "string",
+  "period": null | "today" | "week",
+  "user_question": "short description of what you see in the image (or the user message)",
+  "answer": "short, friendly explanation (use null for stats_query, log_count, log_list, goal_check)"
+}
+
+Rules:
+- If the image shows food or a meal: set type = "activity_update", fill activity with name and calories (estimate if not visible). activity.type = "consume".
+- If the image is a nutrition label: extract product name and calories per serving; set type = "activity_update", activity with that name and calories, type = "consume".
+- If the image shows exercise or workout: set type = "activity_update", activity.type = "burn", estimate calories if needed.
+- If the image is unclear or not about food/exercise: set type = "out_of_scope", answer = "I can only help with food and exercise logging. Please send a photo of food or a nutrition label."
+- Always return all fields. Use null when not relevant.
+- Return only the JSON object — no other text.`;
+}
+
 exports.generateActivity = functions
   .runWith({
     timeoutSeconds: 300,
@@ -111,18 +144,33 @@ exports.generateActivity = functions
         console.log('Received request body:', JSON.stringify(request.body, null, 2));
         console.log('Request headers:', JSON.stringify(request.headers, null, 2));
 
-        if (!request.body.prompt) {
-          console.log('\n=== MISSING PROMPT ===');
+        const hasPrompt = request.body.prompt != null && String(request.body.prompt).trim() !== '';
+        const hasImage = request.body.image && request.body.image.data;
+        if (!hasPrompt && !hasImage) {
+          console.log('\n=== MISSING PROMPT AND IMAGE ===');
           response.status(400).json({
-            error: "Missing prompt in request body."
+            error: "Missing prompt or image in request body. Send { prompt: \"...\" } and/or { image: { data: base64, mimeType: \"image/jpeg\" } }."
           });
           return;
         }
-        
-        // Call LLM via generic layer (provider from env: default Gemini)
-        const prompt = buildCaloriePrompt(request.body.prompt);
+
+        let prompt;
+        let imageOption = null;
+        if (hasImage) {
+          const allowedMime = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+          const mimeType = request.body.image.mimeType || 'image/jpeg';
+          if (!allowedMime.includes(mimeType)) {
+            response.status(400).json({ error: "Invalid image type. Use image/jpeg, image/png, image/webp, or image/gif." });
+            return;
+          }
+          imageOption = { data: request.body.image.data, mimeType };
+          prompt = buildCaloriePromptForImage(hasPrompt ? request.body.prompt : '');
+        } else {
+          prompt = buildCaloriePrompt(request.body.prompt);
+        }
+
         console.log('=== LLM REQUEST ===');
-        const fullResponse = await getLLMResponse(prompt, { jsonMode: true });
+        const fullResponse = await getLLMResponse(prompt, { jsonMode: true, image: imageOption });
         console.log('\n=== LLM RESPONSE ===');
 
         console.log('\n=== PARSED RESPONSE ===');

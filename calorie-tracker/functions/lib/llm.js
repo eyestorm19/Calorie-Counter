@@ -18,7 +18,7 @@ async function getLLMResponse(prompt, options = {}) {
   const jsonMode = options.jsonMode !== false;
 
   if (provider === 'gemini') {
-    return callGemini(prompt, { jsonMode, apiKey: options.apiKey, model: options.model });
+    return callGemini(prompt, { jsonMode, apiKey: options.apiKey, model: options.model, image: options.image });
   }
   // Add more providers later, e.g.:
   // if (provider === 'ollama') return callOllama(prompt, options);
@@ -38,7 +38,16 @@ async function callGemini(prompt, options = {}) {
   const genConfig = options.jsonMode ? { responseMimeType: 'application/json' } : {};
   const genModel = genAI.getGenerativeModel({ model, generationConfig: genConfig });
 
-  const result = await genModel.generateContent(prompt);
+  let result;
+  if (options.image && options.image.data) {
+    const parts = [
+      { inlineData: { mimeType: options.image.mimeType || 'image/jpeg', data: options.image.data } },
+      { text: prompt }
+    ];
+    result = await genModel.generateContent(parts);
+  } else {
+    result = await genModel.generateContent(prompt);
+  }
   const text = result.response?.text?.();
   if (text == null) {
     throw new Error('Empty or invalid response from Gemini');

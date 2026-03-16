@@ -200,10 +200,15 @@ interface ChatInputProps {
   activities: Activity[];
 }
 
+const MAX_IMAGE_SIZE_BYTES = 4 * 1024 * 1024; // 4MB
+const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+
 export default function ChatInput({ onActivityAdd, onActivityDelete, onActivityEdit, currentStats, activities }: ChatInputProps) {
   const { user } = useAuth();
   const [message, setMessage] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
+  const [attachedImage, setAttachedImage] = useState<{ data: string; mimeType: string } | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [messages, setMessages] = useState<Message[]>([{
     id: 'welcome',
     text: AI_SERVICE_AVAILABLE 
@@ -237,13 +242,38 @@ export default function ChatInput({ onActivityAdd, onActivityDelete, onActivityE
     scrollToBottom();
   }, [messages]);
 
+  const handleImageAttach = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
+      return;
+    }
+    if (file.size > MAX_IMAGE_SIZE_BYTES) {
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = reader.result as string;
+      const match = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
+      if (match) {
+        setAttachedImage({ data: match[2], mimeType: file.type });
+      }
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  };
+
+  const clearAttachedImage = () => setAttachedImage(null);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!message.trim() || isProcessing) return;
+    if (isProcessing) return;
+    if (!message.trim() && !attachedImage) return;
 
+    const displayText = message.trim() || (attachedImage ? '[Photo]' : '');
     const userMessage: Message = {
       id: Date.now().toString(),
-      text: message,
+      text: displayText,
       type: 'user',
       timestamp: new Date()
     };
@@ -251,8 +281,46 @@ export default function ChatInput({ onActivityAdd, onActivityDelete, onActivityE
     setIsProcessing(true);
 
     try {
-      // First check if it's in structured format
-      if (isStructuredInputFormat(message)) {
+      // If image attached, always use AI (multimodal). Otherwise check structured format.
+      if (attachedImage && AI_SERVICE_AVAILABLE) {
+        try {
+          const body: { prompt: string; stream: boolean; image?: { data: string; mimeType: string } } = {
+            prompt: message.trim() || ' ',
+            stream: false,
+            image: { data: attachedImage.data, mimeType: attachedImage.mimeType }
+          };
+          const response = await fetch(API_ENDPOINT, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify(body)
+          });
+          const data = await response.json();
+          setAttachedImage(null);
+          if (!response.ok || data.error) {
+            const text = data.fallbackMessage || data.error || "Couldn't process the image. Try again or use text.";
+            setMessages(prev => [...prev, { id: Date.now().toString(), text, type: 'assistant', timestamp: new Date() }]);
+            setMessage('');
+            return;
+          }
+          if (!data.response) {
+            setMessages(prev => [...prev, { id: Date.now().toString(), text: "Sorry, I couldn't understand that image.", type: 'assistant', timestamp: new Date() }]);
+            setMessage('');
+            return;
+          }
+          const activityData = JSON.parse(data.response);
+          await handleActivityData(activityData);
+        } catch (err) {
+          console.warn('Image request failed', err);
+          setMessages(prev => [...prev, { id: Date.now().toString(), text: "Couldn't process the image. Try again.", type: 'assistant', timestamp: new Date() }]);
+          setAttachedImage(null);
+        }
+        setMessage('');
+        setIsProcessing(false);
+        return;
+      }
+
+      if (!attachedImage && isStructuredInputFormat(message)) {
         // Use structured input parser directly for structured format
         const activityData = parseStructuredInput(message);
         await handleActivityData(activityData);
@@ -277,6 +345,7 @@ export default function ChatInput({ onActivityAdd, onActivityDelete, onActivityE
             credentials: 'include',
             body: JSON.stringify({ prompt: message, stream: false }),
           });
+          setAttachedImage(null);
 
           const data = await response.json();
 
@@ -503,19 +572,46 @@ export default function ChatInput({ onActivityAdd, onActivityDelete, onActivityE
 
       <form onSubmit={handleSubmit} className="chat-form">
         <input
-          type="text"
-          value={message}
-          onChange={(e) => setMessage(e.target.value)}
-          placeholder={AI_SERVICE_AVAILABLE 
-            ? "Describe your activity or use structured format" 
-            : "Use format: item: [name], calories: [number], type: [consume/burn]"}
-          className="chat-input"
-          disabled={isProcessing}
+          ref={fileInputRef}
+          type="file"
+          accept={ALLOWED_IMAGE_TYPES.join(',')}
+          onChange={handleImageAttach}
+          className="chat-file-input"
+          aria-label="Attach image"
         />
+        <div className="chat-form-main">
+        <div className="chat-form-row">
+          <input
+            type="text"
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+            placeholder={AI_SERVICE_AVAILABLE 
+              ? "Describe your activity, attach a photo, or use structured format" 
+              : "Use format: item: [name], calories: [number], type: [consume/burn]"}
+            className="chat-input"
+            disabled={isProcessing}
+          />
+          {AI_SERVICE_AVAILABLE && (
+            <button
+              type="button"
+              className="chat-attach"
+              onClick={() => fileInputRef.current?.click()}
+              title="Attach image (food or label)"
+              disabled={isProcessing}
+              aria-label="Attach image"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="20" height="20">
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                <circle cx="8.5" cy="8.5" r="1.5"/>
+                <polyline points="21 15 16 10 5 21"/>
+              </svg>
+            </button>
+          )}
+        </div>
         <button 
           type="submit" 
           className="chat-submit"
-          disabled={isProcessing || !message.trim()}
+          disabled={isProcessing || (!message.trim() && !attachedImage)}
         >
           {isProcessing ? (
             <div className="thinking-icon" />
@@ -538,6 +634,13 @@ export default function ChatInput({ onActivityAdd, onActivityDelete, onActivityE
             </div>
           )}
         </button>
+        </div>
+        {attachedImage && (
+          <div className="chat-image-preview">
+            <span>Image attached</span>
+            <button type="button" className="chat-image-clear" onClick={clearAttachedImage} aria-label="Remove image">×</button>
+          </div>
+        )}
       </form>
     </div>
   );
