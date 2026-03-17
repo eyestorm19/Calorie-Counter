@@ -2416,11 +2416,11 @@ form p a:hover {
 }
 
 .net-calories.below-target {
-    color: var(--success-color); /* Green */
+    color: #bbf7d0;
 }
 
 .net-calories.above-target {
-    color: var(--error-color); /* Red */
+    color: #fecaca;
 }
 
 .total-calories {
@@ -2464,14 +2464,14 @@ form p a:hover {
   position: sticky;
   top: 0;
   z-index: 100;
-  background: linear-gradient(135deg, #f3f7ff 0%, #e6f3ff 100%);
+  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
   border-radius: 0 0 16px 16px;
   padding: 1.5rem;
-  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.12);
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.32);
   margin: -2rem -2rem 1.5rem -2rem;
-  border-bottom: 1px solid rgba(148, 163, 253, 0.3);
-  border-left: 1px solid rgba(148, 163, 253, 0.3);
-  border-right: 1px solid rgba(148, 163, 253, 0.3);
+  border-bottom: none;
+  border-left: none;
+  border-right: none;
   backdrop-filter: blur(8px);
 }
 
@@ -2488,7 +2488,7 @@ form p a:hover {
 
 .header-top .date-display {
   font-size: 1.2rem;
-  color: var(--text-light);
+  color: #e5edff;
   margin: 0;
 }
 
@@ -2497,9 +2497,9 @@ form p a:hover {
   flex-direction: column;
   align-items: flex-start;
   gap: 0.75rem;
-  padding: 0.75rem;
-  background-color: var(--background-color);
-  border-radius: 8px;
+  padding: 0.75rem 0;
+  background-color: transparent;
+  border-radius: 0;
 }
 
 .summary-main {
@@ -2520,8 +2520,8 @@ form p a:hover {
 }
 
 .net-calories {
-  font-size: 1.75rem;
-  font-weight: bold;
+  font-size: 2rem;
+  font-weight: 700;
   line-height: 1.2;
 }
 
