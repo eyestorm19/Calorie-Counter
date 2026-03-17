@@ -44,7 +44,7 @@ const COMMON_TIMEZONES = [
 ];
 
 export default function Profile() {
-  const { user, isNewUser, clearNewUserFlag } = useAuth();
+  const { user, isNewUser, clearNewUserFlag, logout } = useAuth();
   const { dbKey, formattedDate, isNewDay } = useDate();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [isEditing, setIsEditing] = useState(false);
@@ -476,11 +476,16 @@ export default function Profile() {
           <div className="profile-card">
             <div className="profile-header">
               <h2>Profile</h2>
-              {!isEditing && (
-                <button onClick={handleEdit} className="edit-button" title="Edit Profile">
-                  <i className="material-icons">edit</i>
+              <div className="profile-header-actions">
+                {!isEditing && (
+                  <button onClick={handleEdit} className="edit-button" title="Edit Profile">
+                    <i className="material-icons">edit</i>
+                  </button>
+                )}
+                <button onClick={logout} className="logout-icon" title="Log out">
+                  <i className="material-icons">logout</i>
                 </button>
-              )}
+              </div>
             </div>
 
             {/* AI capabilities info card */}

@@ -29,9 +29,6 @@ export default function Navbar() {
               >
                 Profile
               </Link>
-              <button onClick={logout} className="navbar-item logout-button">
-                Logout
-              </button>
             </>
           ) : (
             <>

@@ -637,7 +637,7 @@ export default function ChatInput({ onActivityAdd, onActivityDelete, onActivityE
 
           <button
             type="submit"
-            className="chat-icon-button chat-icon-right"
+            className={`chat-icon-button chat-icon-right ${isProcessing ? 'processing' : ''}`}
             disabled={isProcessing || (!message.trim() && !attachedImage)}
             aria-label="Send message"
           >
