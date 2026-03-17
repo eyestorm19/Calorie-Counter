@@ -397,13 +397,13 @@ export default function Track() {
                       <div className="activity-actions">
                         {editActivity?.id === activity.id ? (
                           <>
-                            <button type="button" className="submit-button" onClick={handleEditSubmit} title="Save"><i className="material-icons">check</i></button>
-                            <button type="button" className="cancel-button" onClick={() => setEditActivity(null)} title="Cancel"><i className="material-icons">close</i></button>
+                            <button type="button" className="btn-icon btn-icon--primary-soft" onClick={handleEditSubmit} title="Save"><i className="material-icons">check</i></button>
+                            <button type="button" className="btn-icon btn-icon--cancel" onClick={() => setEditActivity(null)} title="Cancel"><i className="material-icons">close</i></button>
                           </>
                         ) : (
                           <>
-                            <button type="button" className="edit-button" onClick={() => handleEdit(activity)} title="Edit"><i className="material-icons">edit</i></button>
-                            <button type="button" className="delete-button" onClick={() => handleDelete(activity.id)} title="Delete"><i className="material-icons">delete</i></button>
+                            <button type="button" className="btn-icon btn-icon--edit" onClick={() => handleEdit(activity)} title="Edit"><i className="material-icons">edit</i></button>
+                            <button type="button" className="btn-icon btn-icon--delete" onClick={() => handleDelete(activity.id)} title="Delete"><i className="material-icons">delete</i></button>
                           </>
                         )}
                       </div>
@@ -453,13 +453,13 @@ export default function Track() {
                       <div className="activity-actions">
                         {editActivity?.id === activity.id ? (
                           <>
-                            <button type="button" className="submit-button" onClick={handleEditSubmit} title="Save"><i className="material-icons">check</i></button>
-                            <button type="button" className="cancel-button" onClick={() => setEditActivity(null)} title="Cancel"><i className="material-icons">close</i></button>
+                            <button type="button" className="btn-icon btn-icon--primary-soft" onClick={handleEditSubmit} title="Save"><i className="material-icons">check</i></button>
+                            <button type="button" className="btn-icon btn-icon--cancel" onClick={() => setEditActivity(null)} title="Cancel"><i className="material-icons">close</i></button>
                           </>
                         ) : (
                           <>
-                            <button type="button" className="edit-button" onClick={() => handleEdit(activity)} title="Edit"><i className="material-icons">edit</i></button>
-                            <button type="button" className="delete-button" onClick={() => handleDelete(activity.id)} title="Delete"><i className="material-icons">delete</i></button>
+                            <button type="button" className="btn-icon btn-icon--edit" onClick={() => handleEdit(activity)} title="Edit"><i className="material-icons">edit</i></button>
+                            <button type="button" className="btn-icon btn-icon--delete" onClick={() => handleDelete(activity.id)} title="Delete"><i className="material-icons">delete</i></button>
                           </>
                         )}
                       </div>

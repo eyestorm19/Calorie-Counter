@@ -546,7 +546,7 @@ export default function ChatInput({ onActivityAdd, onActivityDelete, onActivityE
                     onClick={() => toggleDetails(msg.id)}
                     aria-expanded={expandedDetails.has(msg.id)}
                   >
-                    {expandedDetails.has(msg.id) ? 'Hide full response' : 'Thinking'}
+                    {expandedDetails.has(msg.id) ? 'Hide full response' : 'Details'}
                   </button>
                   {expandedDetails.has(msg.id) && (
                     <pre className="thinking-details">
@@ -621,6 +621,23 @@ export default function ChatInput({ onActivityAdd, onActivityDelete, onActivityE
           )}
 
           <div className="chat-input-pill">
+            {attachedImage && (
+              <div className="chat-attached-thumbnail">
+                <img
+                  src={`data:${attachedImage.mimeType};base64,${attachedImage.data}`}
+                  alt="Attached"
+                  className="chat-thumbnail-img"
+                />
+                <button
+                  type="button"
+                  className="chat-thumbnail-remove"
+                  onClick={clearAttachedImage}
+                  aria-label="Remove image"
+                >
+                  ×
+                </button>
+              </div>
+            )}
             <input
               type="text"
               value={message}
@@ -642,7 +659,11 @@ export default function ChatInput({ onActivityAdd, onActivityDelete, onActivityE
             aria-label="Send message"
           >
             {isProcessing ? (
-              <div className="thinking-icon" />
+              <div className="thinking-dots" aria-label="Thinking">
+                <span className="thinking-dot" />
+                <span className="thinking-dot" />
+                <span className="thinking-dot" />
+              </div>
             ) : (
               <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -661,12 +682,6 @@ export default function ChatInput({ onActivityAdd, onActivityDelete, onActivityE
             )}
           </button>
         </div>
-        {attachedImage && (
-          <div className="chat-image-preview">
-            <span>Image attached</span>
-            <button type="button" className="chat-image-clear" onClick={clearAttachedImage} aria-label="Remove image">×</button>
-          </div>
-        )}
       </form>
     </div>
   );

@@ -478,11 +478,11 @@ export default function Profile() {
               <h2>Profile</h2>
               <div className="profile-header-actions">
                 {!isEditing && (
-                  <button onClick={handleEdit} className="edit-button" title="Edit Profile">
+                  <button onClick={handleEdit} className="btn-icon btn-icon--primary" title="Edit Profile">
                     <i className="material-icons">edit</i>
                   </button>
                 )}
-                <button onClick={logout} className="logout-icon" title="Log out">
+                <button onClick={logout} className="btn-icon btn-icon--logout" title="Log out">
                   <i className="material-icons">logout</i>
                 </button>
               </div>
@@ -555,10 +555,10 @@ export default function Profile() {
 
               {isEditing && (
                 <div className="profile-actions">
-                  <button onClick={handleSave} className="save-button" title="Save Changes">
+                  <button onClick={handleSave} className="btn-icon btn-icon--primary" title="Save Changes">
                     <i className="material-icons">check</i>
                   </button>
-                  <button onClick={handleCancel} className="cancel-button" title="Cancel">
+                  <button onClick={handleCancel} className="btn-icon btn-icon--cancel" title="Cancel">
                     <i className="material-icons">close</i>
                   </button>
                 </div>
