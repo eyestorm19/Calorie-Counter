@@ -2,13 +2,14 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useDate } from '../contexts/DateContext';
 import { db } from '../config/firebase';
-import { doc, getDoc, setDoc, updateDoc, Timestamp } from 'firebase/firestore';
+import { doc, getDoc, setDoc, Timestamp } from 'firebase/firestore';
 import type { Activity, DailyData, UserProfile } from '../types';
 import ChatInput from '../components/ChatInput';
+import DayNavigator from '../components/DayNavigator';
 
 export default function Track() {
   const { user } = useAuth();
-  const { dbKey, formattedDate, isNewDay } = useDate();
+  const { dbKey, todayDbKey, isNewDay } = useDate();
   const [newActivity, setNewActivity] = useState('');
   const [calories, setCalories] = useState('');
   const [isBurn, setIsBurn] = useState(false);
@@ -29,6 +30,7 @@ export default function Track() {
   const [editCalories, setEditCalories] = useState('');
   const [consumedExpanded, setConsumedExpanded] = useState(false);
   const [burnedExpanded, setBurnedExpanded] = useState(false);
+  const [datesWithData, setDatesWithData] = useState<string[]>([]);
 
   // Add effect to log state changes
   useEffect(() => {
@@ -129,16 +131,21 @@ export default function Track() {
       console.log('👤 User available, loading profile and data');
       loadUserProfile();
       loadTodayData();
+      loadDatesWithData();
     }
   }, [user, dbKey]); // Reload when date changes
 
-  // Reload data when isNewDay is true
   useEffect(() => {
-    if (isNewDay && user) {
+    if (user && todayDbKey) loadDatesWithData();
+  }, [user, todayDbKey, todayData.activities.length]); // Refresh dots when activities change
+
+  // Reload data when isNewDay is true (only if viewing today)
+  useEffect(() => {
+    if (isNewDay && user && dbKey === todayDbKey) {
       console.log('🔄 New day detected, reloading data');
       loadTodayData();
     }
-  }, [isNewDay]);
+  }, [isNewDay, dbKey, todayDbKey]);
 
   useEffect(() => {
     setAnimatedNetCalories(0);
@@ -157,19 +164,37 @@ export default function Track() {
     }
   };
 
+  /** Load which of the past 7 days (ending today) have data. Matches DayNavigator's getPastSevenDays. */
+  const loadDatesWithData = async () => {
+    if (!user) return;
+    const todayKey = todayDbKey || new Date().toISOString().split('T')[0];
+    const today = new Date(todayKey + 'T12:00:00');
+    const pastSevenDates = Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(today);
+      d.setDate(today.getDate() - (6 - i));
+      return d.toISOString().split('T')[0];
+    });
+
+    const results = await Promise.all(
+      pastSevenDates.map((dateKey) =>
+        getDoc(doc(db, 'users', user.uid, 'dailyLogs', dateKey))
+      )
+    );
+
+    const withData = pastSevenDates.filter((_, i) => results[i].exists());
+    setDatesWithData(withData);
+  };
+
   const loadTodayData = async () => {
-    if (!user) {
-      console.log('❌ No user found in loadTodayData');
+    if (!user || !dbKey) {
+      if (!user) console.log('❌ No user found in loadTodayData');
       return;
     }
     try {
       console.log('📥 Starting to load today data');
-      
-      // Get today's date from context
-      const today = new Date(dbKey);
-      const todayKey = today.toISOString().split('T')[0];
-      
-      // New path: users/{userId}/dailyLogs/{date}
+
+      const todayKey = dbKey;
+
       const docRef = doc(db, 'users', user.uid, 'dailyLogs', todayKey);
       
       console.log('🔍 Fetching data from Firebase:', {
@@ -349,10 +374,10 @@ export default function Track() {
 
   return (
     <div className="container">
+      <DayNavigator datesWithData={datesWithData} />
       <div className="persistent-header">
         <div className="header-summary">
           <div className="summary-main">
-            <h3 className="date-display">{formattedDate}</h3>
             <span className={`net-calories ${todayData.netCalories < targetCalories ? 'below-target' : 'above-target'}`}>
               {todayData.netCalories} / {targetCalories} kcal
             </span>

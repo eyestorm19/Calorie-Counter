@@ -45,7 +45,7 @@ const COMMON_TIMEZONES = [
 
 export default function Profile() {
   const { user, isNewUser, clearNewUserFlag, logout } = useAuth();
-  const { dbKey, formattedDate, isNewDay } = useDate();
+  const { todayDbKey, formattedDate, isNewDay } = useDate();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [editedName, setEditedName] = useState('');
@@ -83,7 +83,7 @@ export default function Profile() {
       };
       loadData();
     }
-  }, [user, dbKey]);
+  }, [user, todayDbKey]);
 
   useEffect(() => {
     if (isNewDay && user) {
@@ -117,20 +117,19 @@ export default function Profile() {
     try {
       console.group('Weekly Data Loading Process');
       
-      // 1. Get today's date from context
-      const today = new Date(dbKey);
+      // 1. Get today's date from context (always use actual today for weekly summary)
+      const today = new Date(todayDbKey);
       console.log('Today (from context):', {
-        dbKey,
+        todayDbKey,
         dateObject: today,
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
       });
-      
+
       // 2. Generate array of past 7 days
       const weekDates = Array.from({ length: 7 }, (_, i) => {
         const date = new Date(today);
         date.setDate(date.getDate() - i);
-        // Ensure we're using the correct year from dbKey
-        const year = new Date(dbKey).getFullYear();
+        const year = new Date(todayDbKey).getFullYear();
         date.setFullYear(year);
         return {
           date: date.toISOString().split('T')[0],
